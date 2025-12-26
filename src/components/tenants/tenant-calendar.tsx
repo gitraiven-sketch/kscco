@@ -49,6 +49,9 @@ export function TenantCalendar({ tenants }: TenantCalendarProps) {
   };
 
   function CustomDay(props: DayProps) {
+    if (!props.date) {
+        return <DayPicker.Day {...props} />;
+    }
     const dayNumber = props.date.getDate();
     const tenantsForDay = tenantsByDay.get(dayNumber);
     const isDueDay = tenantsForDay && tenantsForDay.length > 0;
