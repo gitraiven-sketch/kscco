@@ -17,15 +17,141 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, PlusCircle, Search, Building } from 'lucide-react';
+import { MoreHorizontal, PlusCircle, Search, Building, Loader2 } from 'lucide-react';
 import type { Property } from '@/lib/types';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogClose,
+} from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { useToast } from '@/hooks/use-toast';
 
-export function PropertyList({ properties }: { properties: Property[] }) {
+function EditPropertyForm({
+  property,
+  onPropertyUpdated,
+}: {
+  property: Property;
+  onPropertyUpdated: (updatedProperty: Property) => void;
+}) {
+  const { toast } = useToast();
+  const [isLoading, setIsLoading] = React.useState(false);
+  const [open, setOpen] = React.useState(false);
+  const [editedProperty, setEditedProperty] = React.useState(property);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setEditedProperty(prev => ({ ...prev, [name]: name === 'rentAmount' || name === 'shopNumber' ? Number(value) : value }));
+  };
+
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setIsLoading(true);
+
+    // In a real app, this would be an API call to update the database.
+    // For now, we just simulate it and update the state.
+    setTimeout(() => {
+      onPropertyUpdated(editedProperty);
+      toast({
+        title: 'Property Updated',
+        description: `${editedProperty.name} has been successfully updated.`,
+      });
+      setIsLoading(false);
+      setOpen(false);
+    }, 500);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+          Edit
+        </DropdownMenuItem>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-[425px]">
+        <form onSubmit={handleSubmit}>
+          <DialogHeader>
+            <DialogTitle>Edit Property</DialogTitle>
+            <DialogDescription>
+              Update the details for this property.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+             <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="name" className="text-right">
+                Name
+              </Label>
+              <Input id="name" name="name" value={editedProperty.name} onChange={handleChange} required className="col-span-3" />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="group" className="text-right">
+                Group
+              </Label>
+              <Input id="group" name="group" value={editedProperty.group} onChange={handleChange} required className="col-span-3" />
+            </div>
+             <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="shopNumber" className="text-right">
+                Shop No.
+              </Label>
+              <Input id="shopNumber" name="shopNumber" type="number" value={editedProperty.shopNumber} onChange={handleChange} required className="col-span-3" />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="rentAmount" className="text-right">
+                Rent (K)
+              </Label>
+              <Input
+                id="rentAmount"
+                name="rentAmount"
+                type="number"
+                value={editedProperty.rentAmount}
+                onChange={handleChange}
+                required
+                className="col-span-3"
+              />
+            </div>
+             <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="address" className="text-right">
+                Address
+              </Label>
+              <Input id="address" name="address" value={editedProperty.address} onChange={handleChange} required className="col-span-3" />
+            </div>
+          </div>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button type="button" variant="secondary">
+                Cancel
+              </Button>
+            </DialogClose>
+            <Button type="submit" disabled={isLoading}>
+              {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+
+export function PropertyList({ properties: initialProperties }: { properties: Property[] }) {
   const [searchTerm, setSearchTerm] = React.useState('');
   const [activeTab, setActiveTab] = React.useState('all');
+  const [properties, setProperties] = React.useState(initialProperties);
 
   const propertyGroups = ['Group A', 'Group B', 'Group C'];
+
+  const handlePropertyUpdate = (updatedProperty: Property) => {
+    setProperties(currentProperties => 
+      currentProperties.map(p => p.id === updatedProperty.id ? updatedProperty : p)
+    );
+  };
 
   const filteredProperties = properties.filter(
     (property) => {
@@ -78,7 +204,7 @@ export function PropertyList({ properties }: { properties: Property[] }) {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                            <DropdownMenuItem>Edit</DropdownMenuItem>
+                             <EditPropertyForm property={property} onPropertyUpdated={handlePropertyUpdate} />
                             <DropdownMenuItem>Add Photo</DropdownMenuItem>
                             <DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-destructive/10">
                               Delete
