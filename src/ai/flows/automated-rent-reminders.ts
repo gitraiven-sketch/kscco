@@ -14,7 +14,7 @@ const RentReminderInputSchema = z.object({
   tenantName: z.string().describe('The name of the tenant.'),
   propertyName: z.string().describe('The name of the property.'),
   rentAmount: z.number().describe('The amount of rent due.'),
-  dueDate: z.string().describe('The due date for the rent payment (YYYY-MM-DD).'),
+  dueDate: z.string().describe('The due date for the rent payment (e.g., "15th July, 2024").'),
   phoneNumber: z.string().describe('The tenant phone number to send the reminder to'),
 });
 export type RentReminderInput = z.infer<typeof RentReminderInputSchema>;
@@ -32,15 +32,17 @@ const rentReminderPrompt = ai.definePrompt({
   name: 'rentReminderPrompt',
   input: {schema: RentReminderInputSchema},
   output: {schema: RentReminderOutputSchema},
-  prompt: `Dear {{tenantName}},
+  prompt: `Generate a polite and professional WhatsApp message to a tenant about their upcoming rent payment.
 
-This is a friendly reminder that your rent payment of K{{rentAmount}} for {{propertyName}} is due on {{dueDate}}.
+Here is the information:
+- Tenant Name: {{tenantName}}
+- Property: {{propertyName}}
+- Rent Amount: K{{rentAmount}}
+- Due Date: {{dueDate}}
 
-Please make your payment on time to avoid any late fees.
-
-Thank you,
-Kabwata Shopping Complex Management`,
+The message should be friendly and clear. Start with "Dear {{tenantName}}," and end with "Thank you, Kabwata Shopping Complex Management".`,
 });
+
 
 const generateRentReminderFlow = ai.defineFlow(
   {

@@ -1,21 +1,43 @@
 import type { Tenant, Property, Payment } from './types';
 import { PlaceHolderImages } from './placeholder-images';
 
-export const properties: Property[] = [
-  { id: 'prop1', name: 'Unit 101A', address: '123 Main St, Kabwata', rentAmount: 2500, image: PlaceHolderImages[0].imageUrl, imageHint: PlaceHolderImages[0].imageHint },
-  { id: 'prop2', name: 'Unit 102B', address: '123 Main St, Kabwata', rentAmount: 3000, image: PlaceHolderImages[1].imageUrl, imageHint: PlaceHolderImages[1].imageHint },
-  { id: 'prop3', name: 'Kiosk 3', address: '456 Side Ave, Kabwata', rentAmount: 1200, image: PlaceHolderImages[2].imageUrl, imageHint: PlaceHolderImages[2].imageHint },
-  { id: 'prop4', name: 'Office 201', address: '789 Business Rd, Kabwata', rentAmount: 5500, image: PlaceHolderImages[3].imageUrl, imageHint: PlaceHolderImages[3].imageHint },
-  { id: 'prop5', name: 'Shop 5', address: '123 Main St, Kabwata', rentAmount: 4000, image: PlaceHolderImages[4].imageUrl, imageHint: PlaceHolderImages[4].imageHint },
-  { id: 'prop6', name: 'Restaurant Space', address: '10 Foodie Lane, Kabwata', rentAmount: 7000, image: PlaceHolderImages[5].imageUrl, imageHint: PlaceHolderImages[5].imageHint },
-];
+const generateProperties = (): Property[] => {
+  const groups = [
+    { name: 'Group A', count: 31 },
+    { name: 'Group B', count: 38 },
+    { name: 'Group C', count: 19 },
+  ];
+
+  const allProperties: Property[] = [];
+  let imageIndex = 0;
+
+  groups.forEach(group => {
+    for (let i = 1; i <= group.count; i++) {
+      const propertyName = `${group.name} - Shop ${i}`;
+      const placeholder = PlaceHolderImages[imageIndex % PlaceHolderImages.length];
+      allProperties.push({
+        id: `prop_${group.name.toLowerCase().replace(' ', '')}_${i}`,
+        name: propertyName,
+        address: 'Kabwata Shopping Complex, Lusaka',
+        rentAmount: 2000 + Math.floor(Math.random() * 30) * 100, // Rent from K2000 to K4900
+        image: placeholder.imageUrl,
+        imageHint: placeholder.imageHint,
+      });
+      imageIndex++;
+    }
+  });
+
+  return allProperties;
+};
+
+export const properties: Property[] = generateProperties();
 
 export const tenants: Tenant[] = [
-  { id: 'ten1', name: 'John Doe', email: 'john.doe@example.com', phone: '+260977123456', propertyId: 'prop1', rentAmount: 2500, paymentDay: 1, leaseStartDate: '2023-01-01', leaseEndDate: '2024-12-31' },
-  { id: 'ten2', name: 'Jane Smith', email: 'jane.smith@example.com', phone: '+260966123456', propertyId: 'prop2', rentAmount: 3000, paymentDay: 5, leaseStartDate: '2022-06-01', leaseEndDate: '2024-05-31' },
-  { id: 'ten3', name: 'Bob Johnson', email: 'bob.j@example.com', phone: '+260955123456', propertyId: 'prop3', rentAmount: 1200, paymentDay: 1, leaseStartDate: '2023-11-01', leaseEndDate: '2024-10-31' },
-  { id: 'ten4', name: 'Alice Williams', email: 'alice.w@example.com', phone: '+260777123456', propertyId: 'prop4', rentAmount: 5500, paymentDay: 10, leaseStartDate: '2024-02-15', leaseEndDate: '2025-02-14' },
-  { id: 'ten5', name: 'Charlie Brown', email: 'charlie.b@example.com', phone: '+260765123456', propertyId: 'prop5', rentAmount: 4000, paymentDay: 28, leaseStartDate: '2023-08-01', leaseEndDate: '2024-07-31' },
+  { id: 'ten1', name: 'Besa Chibwe', email: 'besa.c@example.com', phone: '+260977112233', propertyId: 'prop_groupa_1', rentAmount: 2500, paymentDay: 1, leaseStartDate: '2023-01-01', leaseEndDate: '2024-12-31' },
+  { id: 'ten2', name: 'Chisomo Phiri', email: 'chisomo.p@example.com', phone: '+260966223344', propertyId: 'prop_groupa_2', rentAmount: 3000, paymentDay: 5, leaseStartDate: '2022-06-01', leaseEndDate: '2024-05-31' },
+  { id: 'ten3', name: 'Daliso Mumba', email: 'daliso.m@example.com', phone: '+260955334455', propertyId: 'prop_groupb_1', rentAmount: 1200, paymentDay: 1, leaseStartDate: '2023-11-01', leaseEndDate: '2024-10-31' },
+  { id: 'ten4', name: 'Emeli Zande', email: 'emeli.z@example.com', phone: '+260777445566', propertyId: 'prop_groupb_2', rentAmount: 5500, paymentDay: 10, leaseStartDate: '2024-02-15', leaseEndDate: '2025-02-14' },
+  { id: 'ten5', name: 'Fungai Banda', email: 'fungai.b@example.com', phone: '+260765556677', propertyId: 'prop_groupc_1', rentAmount: 4000, paymentDay: 28, leaseStartDate: '2023-08-01', leaseEndDate: '2024-07-31' },
 ];
 
 const today = new Date();

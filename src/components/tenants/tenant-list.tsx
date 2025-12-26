@@ -96,6 +96,7 @@ export function TenantList({ tenants }: { tenants: TenantWithDetails[] }) {
             <TableRow>
               <TableHead>Tenant</TableHead>
               <TableHead>Property</TableHead>
+              <TableHead>Phone Number</TableHead>
               <TableHead>Rent Amount</TableHead>
               <TableHead>Payment Status</TableHead>
               <TableHead>Lease End Date</TableHead>
@@ -123,6 +124,7 @@ export function TenantList({ tenants }: { tenants: TenantWithDetails[] }) {
                     </div>
                   </TableCell>
                   <TableCell>{tenant.property.name}</TableCell>
+                  <TableCell>{tenant.phone}</TableCell>
                   <TableCell>K{tenant.rentAmount.toLocaleString()}</TableCell>
                   <TableCell>
                     <Badge variant="outline" className={statusStyles[tenant.paymentStatus]}>
@@ -152,7 +154,7 @@ export function TenantList({ tenants }: { tenants: TenantWithDetails[] }) {
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={6} className="h-24 text-center">
+                <TableCell colSpan={7} className="h-24 text-center">
                   No tenants found.
                 </TableCell>
               </TableRow>
