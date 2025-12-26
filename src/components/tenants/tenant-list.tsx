@@ -13,11 +13,9 @@ import {
   Search,
   User,
   Loader2,
-  Mail,
-  CheckCircle,
 } from 'lucide-react';
 import type { TenantWithDetails, PaymentStatus, Tenant, Property } from '@/lib/types';
-import { format, formatDistanceToNow } from 'date-fns';
+import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth, useFirestore } from '@/firebase';
 import {
@@ -36,21 +34,17 @@ import { FirestorePermissionError } from '@/firebase/errors';
 import { Input } from '@/components/ui/input';
 import { Button } from '../ui/button';
 import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from '@/components/ui/table';
 import { Avatar, AvatarFallback } from '../ui/avatar';
 import { Badge } from '../ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
 
 function AddTenantForm({ onTenantAdded, properties, tenants }: { onTenantAdded: () => void; properties: Property[], tenants: TenantWithDetails[] }) {
   const firestore = useFirestore();
@@ -121,7 +115,7 @@ function AddTenantForm({ onTenantAdded, properties, tenants }: { onTenantAdded: 
         name: formData.get('name') as string,
         phone: `+260${phone}`,
         propertyId: property.id,
-        rentAmount: 0,
+        rentAmount: 0, // Default rent amount
         paymentDay: property.paymentDay || 1,
         leaseStartDate: formData.get('leaseStartDate') as string,
         lastPaidDate: new Date(formData.get('leaseStartDate') as string).toISOString(),
@@ -382,60 +376,63 @@ export function TenantList({ tenants: initialTenants }: { tenants: TenantWithDet
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
         ) : filteredTenants.length > 0 ? (
-            <Accordion type="multiple" defaultValue={groupOrder} className="w-full">
-            {groupOrder.map(groupName => {
-                const tenantsInGroup = groupedTenants[groupName];
-                if (!tenantsInGroup || tenantsInGroup.length === 0) return null;
-
-                return (
-                    <AccordionItem value={groupName} key={groupName}>
-                        <AccordionTrigger className="text-lg font-semibold">
-                            {groupName} ({tenantsInGroup.length} tenants)
-                        </AccordionTrigger>
-                        <AccordionContent>
-                            <Table>
-                                <TableHeader>
-                                <TableRow>
-                                    <TableHead className="w-[300px]">Tenant</TableHead>
-                                    <TableHead>Property</TableHead>
-                                    <TableHead>Due Date</TableHead>
-                                    <TableHead>Status</TableHead>
-                                    <TableHead className="text-right">Actions</TableHead>
-                                </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                {tenantsInGroup.map((tenant) => (
-                                    <TableRow key={tenant.id}>
-                                    <TableCell>
-                                        <div className="flex items-center gap-3">
-                                            <Avatar className="h-9 w-9">
-                                                <AvatarFallback><User className="h-4 w-4" /></AvatarFallback>
-                                            </Avatar>
-                                            <div>
-                                                <div className="font-medium">{tenant.name}</div>
-                                                <div className="text-xs text-muted-foreground">{tenant.phone}</div>
-                                            </div>
+            <Tabs defaultValue="Group A" className="w-full">
+              <TabsList>
+                {groupOrder.map(groupName => {
+                  if(groupedTenants[groupName] && groupedTenants[groupName].length > 0) {
+                    return <TabsTrigger key={groupName} value={groupName}>{groupName}</TabsTrigger>
+                  }
+                  return null;
+                })}
+              </TabsList>
+              {groupOrder.map(groupName => {
+                  const tenantsInGroup = groupedTenants[groupName];
+                  if (!tenantsInGroup || tenantsInGroup.length === 0) return null;
+                  
+                  return (
+                    <TabsContent value={groupName} key={groupName}>
+                        <Table>
+                            <TableHeader>
+                            <TableRow>
+                                <TableHead className="w-[300px]">Tenant</TableHead>
+                                <TableHead>Property</TableHead>
+                                <TableHead>Due Date</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead className="text-right">Actions</TableHead>
+                            </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                            {tenantsInGroup.map((tenant) => (
+                                <TableRow key={tenant.id}>
+                                <TableCell>
+                                    <div className="flex items-center gap-3">
+                                        <Avatar className="h-9 w-9">
+                                            <AvatarFallback><User className="h-4 w-4" /></AvatarFallback>
+                                        </Avatar>
+                                        <div>
+                                            <div className="font-medium">{tenant.name}</div>
+                                            <div className="text-xs text-muted-foreground">{tenant.phone}</div>
                                         </div>
-                                    </TableCell>
-                                    <TableCell>{tenant.property.name}</TableCell>
-                                    <TableCell>{format(tenant.dueDate, 'do MMMM')}</TableCell>
-                                    <TableCell>
-                                        <StatusBadge status={tenant.paymentStatus} />
-                                    </TableCell>
-                                    <TableCell className="text-right">
-                                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                                            <MoreHorizontal className="h-4 w-4" />
-                                        </Button>
-                                    </TableCell>
-                                    </TableRow>
-                                ))}
-                                </TableBody>
-                            </Table>
-                        </AccordionContent>
-                    </AccordionItem>
-                )
-            })}
-            </Accordion>
+                                    </div>
+                                </TableCell>
+                                <TableCell>{tenant.property.name}</TableCell>
+                                <TableCell>{format(tenant.dueDate, 'do MMMM')}</TableCell>
+                                <TableCell>
+                                    <StatusBadge status={tenant.paymentStatus} />
+                                </TableCell>
+                                <TableCell className="text-right">
+                                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                                        <MoreHorizontal className="h-4 w-4" />
+                                    </Button>
+                                </TableCell>
+                                </TableRow>
+                            ))}
+                            </TableBody>
+                        </Table>
+                    </TabsContent>
+                  )
+              })}
+            </Tabs>
         ) : (
              <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/20 py-24 text-center">
                 <h3 className="mt-4 text-lg font-semibold">No Tenants Found</h3>
