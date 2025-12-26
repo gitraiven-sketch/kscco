@@ -71,8 +71,8 @@ function AddTenantForm({ onTenantAdded, properties }: { onTenantAdded: () => voi
         name: formData.get('name') as string,
         phone: `+260${phone}`,
         propertyId: property.id,
-        rentAmount: property.rentAmount, // Set rent amount from property
-        paymentDay: Number(formData.get('paymentDay')),
+        rentAmount: 0, // rentAmount is no longer on property, so we can set to 0 or remove
+        paymentDay: property.paymentDay, // Set payment day from property
         leaseStartDate: formData.get('leaseStartDate') as string,
         lastPaidDate: new Date(formData.get('leaseStartDate') as string).toISOString(), // Assume paid on lease start
     };
@@ -148,20 +148,6 @@ function AddTenantForm({ onTenantAdded, properties }: { onTenantAdded: () => voi
                 required 
                 className="col-span-3"
                 placeholder="e.g. Group A - Shop 1"
-              />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="paymentDay" className="text-right">
-                Payment Day
-              </Label>
-              <Input
-                id="paymentDay"
-                name="paymentDay"
-                type="number"
-                min="1"
-                max="31"
-                required
-                className="col-span-3"
               />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">

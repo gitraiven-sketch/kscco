@@ -55,7 +55,7 @@ function PropertyForm({
       group: 'Group A',
       shopNumber: 0,
       address: 'Kabwata Shopping Complex, Lusaka',
-      rentAmount: 0,
+      paymentDay: 1,
     }
   );
 
@@ -63,7 +63,7 @@ function PropertyForm({
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    const isNumberField = ['rentAmount', 'shopNumber'].includes(name);
+    const isNumberField = ['shopNumber', 'paymentDay'].includes(name);
     setFormData(prev => ({ 
         ...prev, 
         [name]: isNumberField ? (value === '' ? '' : Number(value)) : value 
@@ -77,8 +77,8 @@ function PropertyForm({
     
     const dataToSave = {
         ...formData,
-        rentAmount: Number(formData.rentAmount),
         shopNumber: Number(formData.shopNumber),
+        paymentDay: Number(formData.paymentDay),
     };
 
 
@@ -145,8 +145,8 @@ function PropertyForm({
               <Input id="shopNumber" name="shopNumber" type="number" value={formData.shopNumber} onChange={handleChange} required className="col-span-3" />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="rentAmount" className="text-right">Rent (K)</Label>
-              <Input id="rentAmount" name="rentAmount" type="number" value={formData.rentAmount} onChange={handleChange} required className="col-span-3" />
+              <Label htmlFor="paymentDay" className="text-right">Pay Day</Label>
+              <Input id="paymentDay" name="paymentDay" type="number" min="1" max="31" value={formData.paymentDay} onChange={handleChange} required className="col-span-3" />
             </div>
              <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="address" className="text-right">Address</Label>
@@ -294,7 +294,7 @@ export function PropertyList({ properties: initialProperties }: { properties: Pr
                      <p className="text-sm text-muted-foreground">{property.address}</p>
                   </CardContent>
                   <CardFooter>
-                    <p className="text-lg font-semibold">K{property.rentAmount.toLocaleString()}</p>
+                    <p className="text-lg font-semibold">Pay Day: {property.paymentDay}</p>
                   </CardFooter>
                 </Card>
               ))}

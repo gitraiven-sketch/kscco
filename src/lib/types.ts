@@ -16,7 +16,7 @@ export type Property = {
   group: string;
   shopNumber: number;
   address: string;
-  rentAmount: number;
+  paymentDay: number;
 };
 
 export type PaymentStatus = 'Paid' | 'Overdue' | 'Upcoming';

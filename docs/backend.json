@@ -71,11 +71,11 @@
             "address": {
                 "type": "string"
             },
-            "rentAmount": {
+            "paymentDay": {
                 "type": "number"
             }
         },
-        "required": ["name", "group", "shopNumber", "address", "rentAmount"]
+        "required": ["name", "group", "shopNumber", "address", "paymentDay"]
     }
   },
   "auth": {
