@@ -58,7 +58,7 @@ export default function DashboardLayout({
             <SidebarContent>
               <SidebarHeader>
                 <Link
-                  href="/"
+                  href="/dashboard"
                   className="flex items-center gap-2 text-primary-foreground hover:text-primary-foreground/80"
                 >
                   <BuildingIcon className="h-7 w-7 text-primary" />
@@ -82,7 +82,7 @@ export default function DashboardLayout({
                     asChild
                     tooltip={{ children: 'Tenants', side: 'right' }}
                   >
-                    <Link href="/tenants">
+                    <Link href="/dashboard/tenants">
                       <Users />
                       <span>Tenants</span>
                     </Link>
@@ -93,7 +93,7 @@ export default function DashboardLayout({
                     asChild
                     tooltip={{ children: 'Properties', side: 'right' }}
                   >
-                    <Link href="/properties">
+                    <Link href="/dashboard/properties">
                       <Building />
                       <span>Properties</span>
                     </Link>
@@ -104,7 +104,7 @@ export default function DashboardLayout({
                     asChild
                     tooltip={{ children: 'Reminders', side: 'right' }}
                   >
-                    <Link href="/reminders">
+                    <Link href="/dashboard/reminders">
                       <Bell />
                       <span>Reminders</span>
                     </Link>
@@ -115,7 +115,7 @@ export default function DashboardLayout({
                     asChild
                     tooltip={{ children: 'Payment History', side: 'right' }}
                   >
-                    <Link href="/history">
+                    <Link href="/dashboard/history">
                       <History />
                       <span>Payment History</span>
                     </Link>
