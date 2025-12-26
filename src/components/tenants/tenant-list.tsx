@@ -225,14 +225,12 @@ export function TenantList({ tenants: initialTenants }: { tenants: TenantWithDet
   const [properties, setProperties] = React.useState<Property[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
 
-  const fetchTenantsAndProperties = React.useCallback(async () => {
+  React.useEffect(() => {
     if (!firestore || !auth) return;
     setIsLoading(true);
-
-    const propertiesQuery = query(collection(firestore, "properties"));
-    const tenantsQuery = query(collection(firestore, "tenants"));
     
-    const unsubProperties = onSnapshot(propertiesQuery, (snapshot) => {
+    const propsQuery = query(collection(firestore, 'properties'));
+    const unsubProps = onSnapshot(propsQuery, (snapshot) => {
         const props = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Property));
         setProperties(props);
     }, (error) => {
@@ -243,18 +241,21 @@ export function TenantList({ tenants: initialTenants }: { tenants: TenantWithDet
         }, auth);
         errorEmitter.emit('permission-error', permissionError);
     });
+
+    return () => unsubProps();
+  }, [firestore, auth]);
+
+  React.useEffect(() => {
+    if (!firestore || !auth || properties.length === 0) {
+        // Don't fetch tenants until properties are loaded
+        // to avoid race conditions.
+        return;
+    }
     
+    const tenantsQuery = query(collection(firestore, 'tenants'));
     const unsubTenants = onSnapshot(tenantsQuery, async (tenantsSnapshot) => {
-        let props: Property[] = properties;
-        // If properties are not loaded yet, fetch them once.
-        if (props.length === 0) {
-            const propsSnapshot = await getDocs(propertiesQuery);
-            props = propsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Property));
-            setProperties(props);
-        }
-        
         const propertyMap = new Map<string, Property>();
-        props.forEach(p => propertyMap.set(p.id, p));
+        properties.forEach(p => propertyMap.set(p.id, p));
 
         const tenantsDataPromises = tenantsSnapshot.docs.map(async (tenantDoc) => {
             const tenantData = { id: tenantDoc.id, ...tenantDoc.data() } as Tenant;
@@ -300,20 +301,9 @@ export function TenantList({ tenants: initialTenants }: { tenants: TenantWithDet
         setIsLoading(false);
     });
 
-    return () => {
-        unsubTenants();
-        unsubProperties();
-    };
-
+    return () => unsubTenants();
   }, [firestore, auth, properties]);
 
-
-  React.useEffect(() => {
-    const unsubscribePromise = fetchTenantsAndProperties();
-    return () => {
-        unsubscribePromise.then(unsub => unsub && unsub());
-    }
-  }, [fetchTenantsAndProperties]);
 
   const filteredTenants = tenants.filter(
     (tenant) =>
@@ -336,7 +326,7 @@ export function TenantList({ tenants: initialTenants }: { tenants: TenantWithDet
         <AddTenantForm properties={properties} tenants={tenants} onTenantAdded={() => { /* data re-fetches automatically */ }} />
       </div>
 
-       {isLoading ? (
+       {(isLoading && tenants.length === 0) ? (
           <div className="flex h-64 w-full items-center justify-center rounded-lg border">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
