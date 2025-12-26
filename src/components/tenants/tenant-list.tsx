@@ -42,7 +42,7 @@ import type { TenantWithDetails, PaymentStatus, Tenant, Property } from '@/lib/t
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { generateRentReminder } from '@/ai/flows/automated-rent-reminders';
-import { useFirestore } from '@/firebase';
+import { useAuth, useFirestore } from '@/firebase';
 import {
   Dialog,
   DialogContent,
@@ -78,6 +78,7 @@ function AddTenantForm({
   onTenantAdded: () => void;
 }) {
   const firestore = useFirestore();
+  const auth = useAuth();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = React.useState(false);
   const [open, setOpen] = React.useState(false);
@@ -87,7 +88,7 @@ function AddTenantForm({
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!firestore) return;
+    if (!firestore || !auth) return;
 
     setIsLoading(true);
     const formData = new FormData(event.currentTarget);
@@ -112,7 +113,7 @@ function AddTenantForm({
           path: tenantsRef.path,
           operation: 'create',
           requestResourceData: newTenantData,
-        });
+        }, auth);
         errorEmitter.emit('permission-error', permissionError);
       })
       .finally(() => {
@@ -250,11 +251,12 @@ export function TenantList({ tenants: initialTenants }: { tenants: TenantWithDet
   const [searchTerm, setSearchTerm] = React.useState('');
   const { toast } = useToast();
   const firestore = useFirestore();
+  const auth = useAuth();
   const [tenants, setTenants] = React.useState<TenantWithDetails[]>(initialTenants);
   const [isLoading, setIsLoading] = React.useState(true);
 
   const fetchTenants = React.useCallback(async () => {
-    if (!firestore) return;
+    if (!firestore || !auth) return;
     setIsLoading(true);
 
     const tenantsQuery = query(collection(firestore, "tenants"));
@@ -289,14 +291,14 @@ export function TenantList({ tenants: initialTenants }: { tenants: TenantWithDet
         const permissionError = new FirestorePermissionError({
             path: tenantsQuery.path,
             operation: 'list',
-        });
+        }, auth);
         errorEmitter.emit('permission-error', permissionError);
         setIsLoading(false);
     });
 
     return unsubscribe;
 
-  }, [firestore]);
+  }, [firestore, auth]);
 
 
   React.useEffect(() => {
@@ -343,7 +345,7 @@ export function TenantList({ tenants: initialTenants }: { tenants: TenantWithDet
   }
 
   const handleDeleteTenant = async (tenantId: string) => {
-    if (!firestore) return;
+    if (!firestore || !auth) return;
     const tenantDocRef = doc(firestore, 'tenants', tenantId);
     deleteDoc(tenantDocRef)
         .then(() => {
@@ -356,7 +358,7 @@ export function TenantList({ tenants: initialTenants }: { tenants: TenantWithDet
             const permissionError = new FirestorePermissionError({
                 path: tenantDocRef.path,
                 operation: 'delete',
-            });
+            }, auth);
             errorEmitter.emit('permission-error', permissionError);
         });
   }

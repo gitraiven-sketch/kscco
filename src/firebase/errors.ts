@@ -1,7 +1,6 @@
 'use client';
 
-import { onIdTokenChanged, getAuth } from 'firebase/auth';
-import { useUser, useFirebaseApp } from '@/firebase';
+import type { User, Auth } from 'firebase/auth';
 
 export type SecurityRuleContext = {
   path: string;
@@ -12,21 +11,27 @@ export type SecurityRuleContext = {
 export class FirestorePermissionError extends Error {
   public name = 'FirestorePermissionError';
   public context: SecurityRuleContext;
-  public user: ReturnType<typeof useUser>['user'];
+  public user: User | null;
   public token: any;
 
-  constructor(context: SecurityRuleContext) {
-    const message = `The following request was denied by Firestore Security Rules:\n${JSON.stringify(context, null, 2)}`;
+  constructor(context: SecurityRuleContext, auth: Auth) {
+    const user = auth.currentUser;
+    const message = `The following request was denied by Firestore Security Rules:\n${JSON.stringify(
+      {
+        ...context,
+        auth: user ? { uid: user.uid, email: user.email } : null,
+      },
+      null,
+      2
+    )}`;
     super(message);
     this.context = context;
-
-    const app = useFirebaseApp();
-    if (app) {
-      const auth = getAuth(app);
-      this.user = auth.currentUser;
-      auth.currentUser?.getIdTokenResult().then((result) => {
-        this.token = result.claims;
-      });
+    this.user = user;
+    
+    if (user) {
+        user.getIdTokenResult().then((result) => {
+            this.token = result.claims;
+        });
     }
   }
 
@@ -47,27 +52,4 @@ export class FirestorePermissionError extends Error {
         : null,
     };
   }
-}
-
-export function FirebaseErrorListener({ children }: { children: React.ReactNode }) {
-  const [error, setError] = React.useState<FirestorePermissionError | null>(
-    null
-  );
-
-  React.useEffect(() => {
-    const handler = (error: FirestorePermissionError) => {
-      setError(error);
-    };
-    errorEmitter.on('permission-error', handler);
-
-    return () => {
-      errorEmitter.off('permission-error', handler);
-    };
-  }, []);
-
-  if (error) {
-    throw error;
-  }
-
-  return <>{children}</>;
 }

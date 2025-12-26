@@ -1,10 +1,36 @@
 'use client';
 
-import { createContext, useContext, ReactNode, useMemo } from 'react';
+import { createContext, useContext, ReactNode, useMemo, useState, useEffect } from 'react';
 import { FirebaseApp } from 'firebase/app';
 import { Auth } from 'firebase/auth';
 import { Firestore } from 'firebase/firestore';
-import { FirebaseErrorListener } from './errors';
+import { errorEmitter } from './error-emitter';
+import { FirestorePermissionError } from './errors';
+
+
+function FirebaseErrorListener({ children }: { children: React.ReactNode }) {
+  const [error, setError] = useState<FirestorePermissionError | null>(
+    null
+  );
+
+  useEffect(() => {
+    const handler = (error: FirestorePermissionError) => {
+      setError(error);
+    };
+    errorEmitter.on('permission-error', handler);
+
+    return () => {
+      errorEmitter.off('permission-error', handler);
+    };
+  }, []);
+
+  if (error) {
+    throw error;
+  }
+
+  return <>{children}</>;
+}
+
 
 interface FirebaseContextType {
   app: FirebaseApp | null;
