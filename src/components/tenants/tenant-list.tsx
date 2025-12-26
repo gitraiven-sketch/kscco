@@ -38,27 +38,45 @@ import { FirestorePermissionError } from '@/firebase/errors';
 import { Input } from '@/components/ui/input';
 import { Button } from '../ui/button';
 import { TenantCalendar } from './tenant-calendar';
+import { Combobox } from '../ui/combobox';
 
-function AddTenantForm({ onTenantAdded, properties }: { onTenantAdded: () => void; properties: Property[] }) {
+function AddTenantForm({ onTenantAdded, properties, tenants }: { onTenantAdded: () => void; properties: Property[], tenants: TenantWithDetails[] }) {
   const firestore = useFirestore();
   const auth = useAuth();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = React.useState(false);
   const [open, setOpen] = React.useState(false);
-  const [propertyName, setPropertyName] = React.useState('');
+  const [selectedPropertyId, setSelectedPropertyId] = React.useState('');
+  
+  const occupiedPropertyIds = new Set(tenants.map(t => t.propertyId));
+  const vacantProperties = properties.filter(p => !occupiedPropertyIds.has(p.id));
+
+  const propertyOptions = vacantProperties.map(p => ({
+      value: p.id,
+      label: p.name,
+  }));
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!firestore || !auth) return;
 
+    if (!selectedPropertyId) {
+        toast({
+            variant: 'destructive',
+            title: 'Property Not Selected',
+            description: 'Please select a property for the new tenant.',
+        });
+        return;
+    }
+
     setIsLoading(true);
 
-    const property = properties.find(p => p.name.toLowerCase() === propertyName.toLowerCase());
+    const property = properties.find(p => p.id === selectedPropertyId);
     if (!property) {
       toast({
         variant: 'destructive',
         title: 'Property Not Found',
-        description: `Could not find a property named "${propertyName}". Please check the name and try again.`,
+        description: `Selected property could not be found.`,
       });
       setIsLoading(false);
       return;
@@ -71,7 +89,7 @@ function AddTenantForm({ onTenantAdded, properties }: { onTenantAdded: () => voi
         name: formData.get('name') as string,
         phone: `+260${phone}`,
         propertyId: property.id,
-        rentAmount: 0, // rentAmount is no longer on property, so we can set to 0 or remove
+        rentAmount: 0,
         paymentDay: property.paymentDay, // Set payment day from property
         leaseStartDate: formData.get('leaseStartDate') as string,
         lastPaidDate: new Date(formData.get('leaseStartDate') as string).toISOString(), // Assume paid on lease start
@@ -87,7 +105,7 @@ function AddTenantForm({ onTenantAdded, properties }: { onTenantAdded: () => voi
         onTenantAdded();
         setOpen(false);
         (event.target as HTMLFormElement).reset();
-        setPropertyName('');
+        setSelectedPropertyId('');
       })
       .catch((error: any) => {
         const permissionError = new FirestorePermissionError({
@@ -137,18 +155,18 @@ function AddTenantForm({ onTenantAdded, properties }: { onTenantAdded: () => voi
                 </div>
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="propertyName" className="text-right">
+              <Label htmlFor="propertyId" className="text-right">
                 Property
               </Label>
-              <Input 
-                id="propertyName" 
-                name="propertyName" 
-                value={propertyName} 
-                onChange={(e) => setPropertyName(e.target.value)} 
-                required 
-                className="col-span-3"
-                placeholder="e.g. Group A - Shop 1"
-              />
+              <div className="col-span-3">
+                <Combobox 
+                    name="propertyId"
+                    options={propertyOptions}
+                    placeholder="Select a vacant property..."
+                    value={selectedPropertyId}
+                    onValueChange={setSelectedPropertyId}
+                />
+              </div>
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="leaseStartDate" className="text-right">
@@ -204,6 +222,7 @@ export function TenantList({ tenants: initialTenants }: { tenants: TenantWithDet
     
     const unsubTenants = onSnapshot(tenantsQuery, async (tenantsSnapshot) => {
         const propertyMap = new Map<string, Property>();
+        // We need to make sure we have the latest properties when tenants update
         const propsSnapshot = await getDocs(propertiesQuery);
         propsSnapshot.forEach(doc => {
             propertyMap.set(doc.id, { id: doc.id, ...doc.data() } as Property);
@@ -225,15 +244,23 @@ export function TenantList({ tenants: initialTenants }: { tenants: TenantWithDet
               paymentStatus = 'Paid';
             }
             
+            const property = propertyMap.get(tenantData.propertyId);
+            
+            if (!property) {
+                // This can happen if a property is deleted but the tenant record still exists
+                console.warn(`Could not find property with ID: ${tenantData.propertyId} for tenant ${tenantData.name}`);
+                return null;
+            }
+
             return {
                 ...tenantData,
-                property: propertyMap.get(tenantData.propertyId)!,
+                property: property,
                 paymentStatus: paymentStatus,
                 dueDate: dueDate,
             };
         });
 
-        const tenantsData = await Promise.all(tenantsDataPromises);
+        const tenantsData = (await Promise.all(tenantsDataPromises)).filter(Boolean) as TenantWithDetails[];
         setTenants(tenantsData);
         setIsLoading(false);
     },
@@ -279,7 +306,7 @@ export function TenantList({ tenants: initialTenants }: { tenants: TenantWithDet
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <AddTenantForm properties={properties} onTenantAdded={() => { /* data re-fetches automatically */ }} />
+        <AddTenantForm properties={properties} tenants={tenants} onTenantAdded={() => { /* data re-fetches automatically */ }} />
       </div>
 
        {isLoading ? (
