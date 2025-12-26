@@ -39,6 +39,7 @@ import {
   User,
   Loader2,
   Mail,
+  CheckCircle,
 } from 'lucide-react';
 import type { TenantWithDetails, PaymentStatus, Tenant, Property, Payment } from '@/lib/types';
 import { format } from 'date-fns';
@@ -120,7 +121,7 @@ function RecordPaymentForm({ tenant, onPaymentAdded }: { tenant: Tenant, onPayme
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-          Record Payment
+          Record Custom Payment
         </DropdownMenuItem>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">
@@ -626,6 +627,33 @@ export function TenantList({ tenants: initialTenants }: { tenants: TenantWithDet
     }
   }
 
+  const handleMarkAsPaid = async (tenant: TenantWithDetails) => {
+    if (!firestore || !auth) return;
+
+    const newPayment: Omit<Payment, 'id'> = {
+      tenantId: tenant.id,
+      amount: tenant.rentAmount,
+      date: new Date().toISOString(),
+    };
+
+    const paymentsRef = collection(firestore, 'tenants', tenant.id, 'payments');
+    addDoc(paymentsRef, newPayment)
+      .then((docRef) => {
+        toast({
+          title: 'Payment Recorded',
+          description: `Payment for ${tenant.name} has been recorded.`,
+        });
+        handleSendReceipt(tenant, docRef.id);
+      })
+      .catch((error) => {
+        const permissionError = new FirestorePermissionError({
+          path: paymentsRef.path,
+          operation: 'create',
+          requestResourceData: newPayment,
+        }, auth);
+        errorEmitter.emit('permission-error', permissionError);
+      });
+  };
 
   const handleDeleteTenant = async (tenantId: string) => {
     if (!firestore || !auth) return;
@@ -724,6 +752,10 @@ export function TenantList({ tenants: initialTenants }: { tenants: TenantWithDet
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                        <DropdownMenuItem onSelect={() => handleMarkAsPaid(tenant)} disabled={tenant.paymentStatus === 'Paid'}>
+                          <CheckCircle className="mr-2 h-4 w-4" />
+                          Mark as Paid
+                        </DropdownMenuItem>
                         <RecordPaymentForm tenant={tenant} onPaymentAdded={(paymentId) => handleSendReceipt(tenant, paymentId)} />
                         <EditTenantForm tenant={tenant} properties={properties} onTenantUpdated={() => { /* re-fetch handled by snapshot */ }}/>
                         <DropdownMenuSeparator />
@@ -755,3 +787,5 @@ export function TenantList({ tenants: initialTenants }: { tenants: TenantWithDet
     </div>
   );
 }
+
+    
