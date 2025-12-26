@@ -47,7 +47,11 @@ function EditPropertyForm({
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setEditedProperty(prev => ({ ...prev, [name]: name === 'rentAmount' || name === 'shopNumber' ? Number(value) : value }));
+    const isNumberField = name === 'rentAmount' || name === 'shopNumber';
+    setEditedProperty(prev => ({ 
+        ...prev, 
+        [name]: isNumberField ? (value === '' ? '' : Number(value)) : value 
+    }));
   };
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -57,7 +61,10 @@ function EditPropertyForm({
     // In a real app, this would be an API call to update the database.
     // For now, we just simulate it and update the state.
     setTimeout(() => {
-      onPropertyUpdated(editedProperty);
+      onPropertyUpdated({
+          ...editedProperty,
+          rentAmount: Number(editedProperty.rentAmount)
+      });
       toast({
         title: 'Property Updated',
         description: `${editedProperty.name} has been successfully updated.`,
@@ -108,7 +115,7 @@ function EditPropertyForm({
               <Input
                 id="rentAmount"
                 name="rentAmount"
-                type="text"
+                type="number"
                 value={editedProperty.rentAmount}
                 onChange={handleChange}
                 required
