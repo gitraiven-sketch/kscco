@@ -40,61 +40,52 @@ function BuildingIcon(props: React.SVGProps<SVGSVGElement>) {
   );
 }
 
-export default function LoginPage() {
+export default function SignupPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
-  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
-  useEffect(() => {
-    if (localStorage.getItem('isLoggedIn')) {
-      router.replace('/dashboard');
-    } else {
-      setIsCheckingAuth(false);
-    }
-  }, [router]);
-
-  const handleLogin = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSignup = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setIsLoading(true);
 
-    // Simulate API call
+    // Simulate API call for signup
     setTimeout(() => {
-      // In a real app, you'd verify credentials here
-      localStorage.setItem('isLoggedIn', 'true');
+      // In a real app, you would create the user here
       toast({
-        title: 'Login Successful',
-        description: "Welcome back, Admin!",
+        title: 'Account Created',
+        description: "You can now log in with your new account.",
       });
-      router.push('/dashboard');
+      router.push('/login');
       setIsLoading(false);
     }, 1000);
   };
 
-  if (isCheckingAuth) {
-    return (
-       <div className="flex h-screen w-full items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    )
-  }
-
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <Card className="w-full max-w-sm shadow-2xl">
-        <form onSubmit={handleLogin}>
+        <form onSubmit={handleSignup}>
           <CardHeader className="text-center">
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
               <BuildingIcon className="h-8 w-8 text-primary" />
             </div>
             <CardTitle className="text-2xl font-bold">
-              Kabwata Shopping Complex
+              Create an Account
             </CardTitle>
             <CardDescription>
-              Enter your credentials to access the admin panel.
+              Enter your details to create a new account.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">Name</Label>
+              <Input
+                id="name"
+                type="text"
+                placeholder="John Doe"
+                required
+              />
+            </div>
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input
@@ -102,7 +93,6 @@ export default function LoginPage() {
                 type="email"
                 placeholder="admin@example.com"
                 required
-                defaultValue="admin@example.com"
               />
             </div>
             <div className="space-y-2">
@@ -111,19 +101,18 @@ export default function LoginPage() {
                 id="password" 
                 type="password" 
                 required 
-                defaultValue="password"
               />
             </div>
           </CardContent>
           <CardFooter className="flex flex-col gap-4">
             <Button className="w-full" type="submit" disabled={isLoading}>
               {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Sign In
+              Sign Up
             </Button>
              <p className="text-sm text-center text-muted-foreground">
-              Don&apos;t have an account?{' '}
-              <Link href="/signup" className="font-semibold text-primary hover:underline">
-                Sign up
+              Already have an account?{' '}
+              <Link href="/login" className="font-semibold text-primary hover:underline">
+                Sign In
               </Link>
             </p>
           </CardFooter>
