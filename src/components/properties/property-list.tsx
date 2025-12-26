@@ -144,27 +144,13 @@ function PropertyForm({
     try {
       if (isEditMode) {
         const propRef = doc(firestore, 'properties', property.id);
-        updateDoc(propRef, dataToSave).catch(e => {
-           const permissionError = new FirestorePermissionError({
-              path: `properties/${property.id}`,
-              operation: 'update',
-              requestResourceData: dataToSave,
-            }, auth);
-            errorEmitter.emit('permission-error', permissionError);
-        });
+        await updateDoc(propRef, dataToSave);
         toast({
           title: 'Property Updated',
           description: `${formData.name} has been successfully updated.`,
         });
       } else {
-        addDoc(collection(firestore, 'properties'), dataToSave).catch(e => {
-            const permissionError = new FirestorePermissionError({
-              path: 'properties',
-              operation: 'create',
-              requestResourceData: dataToSave,
-            }, auth);
-            errorEmitter.emit('permission-error', permissionError);
-        });
+        await addDoc(collection(firestore, 'properties'), dataToSave);
         toast({
           title: 'Property Added',
           description: `${formData.name} has been successfully added.`,
@@ -173,7 +159,13 @@ function PropertyForm({
       onSave();
       setOpen(false);
     } catch(error) {
-       console.error("Unexpected error in handleSubmit:", error);
+       console.error("Error saving property:", error);
+       const permissionError = new FirestorePermissionError({
+          path: isEditMode ? `properties/${property.id}` : 'properties',
+          operation: isEditMode ? 'update' : 'create',
+          requestResourceData: dataToSave,
+        }, auth);
+        errorEmitter.emit('permission-error', permissionError);
     } finally {
       setIsLoading(false);
     }
