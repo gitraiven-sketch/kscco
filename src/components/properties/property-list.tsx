@@ -59,6 +59,7 @@ function PropertyForm({
   const auth = useAuth();
   const [isLoading, setIsLoading] = React.useState(false);
   const [open, setOpen] = React.useState(false);
+  
   const [formData, setFormData] = React.useState(
     property || {
       name: '',
@@ -68,6 +69,21 @@ function PropertyForm({
       paymentDay: 1,
     }
   );
+
+  React.useEffect(() => {
+    if (open) {
+      setFormData(
+        property || {
+          name: '',
+          group: 'Group A',
+          shopNumber: 0,
+          address: 'Kabwata Shopping Complex, Lusaka',
+          paymentDay: 1,
+        }
+      );
+    }
+  }, [open, property]);
+
 
   const isEditMode = !!property;
 
