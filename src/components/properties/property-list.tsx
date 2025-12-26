@@ -18,7 +18,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { MoreHorizontal, PlusCircle, Search, Building, Loader2 } from 'lucide-react';
-import type { Property } from '@/lib/types';
+import type { Property, Tenant } from '@/lib/types';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
@@ -27,7 +27,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
   DialogClose,
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
@@ -36,6 +35,16 @@ import { useFirestore, useAuth } from '@/firebase';
 import { collection, onSnapshot, doc, updateDoc, addDoc, deleteDoc, query } from 'firebase/firestore';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
+import { Avatar, AvatarFallback } from '../ui/avatar';
+import { User } from 'lucide-react';
+import { formatDistanceToNow } from 'date-fns';
+
+function getDueDate(tenant: Tenant): Date {
+    const lastPaid = tenant.lastPaidDate ? new Date(tenant.lastPaidDate) : new Date(tenant.leaseStartDate);
+    let dueDate = new Date(lastPaid.getFullYear(), lastPaid.getMonth(), tenant.paymentDay);
+    dueDate.setMonth(dueDate.getMonth() + 1);
+    return dueDate;
+}
 
 function PropertyForm({
   property,
@@ -85,13 +94,27 @@ function PropertyForm({
     try {
       if (isEditMode) {
         const propRef = doc(firestore, 'properties', property.id);
-        await updateDoc(propRef, dataToSave);
+        updateDoc(propRef, dataToSave).catch(e => {
+           const permissionError = new FirestorePermissionError({
+              path: `properties/${property.id}`,
+              operation: 'update',
+              requestResourceData: dataToSave,
+            }, auth);
+            errorEmitter.emit('permission-error', permissionError);
+        });
         toast({
           title: 'Property Updated',
           description: `${formData.name} has been successfully updated.`,
         });
       } else {
-        await addDoc(collection(firestore, 'properties'), dataToSave);
+        addDoc(collection(firestore, 'properties'), dataToSave).catch(e => {
+            const permissionError = new FirestorePermissionError({
+              path: 'properties',
+              operation: 'create',
+              requestResourceData: dataToSave,
+            }, auth);
+            errorEmitter.emit('permission-error', permissionError);
+        });
         toast({
           title: 'Property Added',
           description: `${formData.name} has been successfully added.`,
@@ -100,12 +123,7 @@ function PropertyForm({
       onSave();
       setOpen(false);
     } catch(error) {
-       const permissionError = new FirestorePermissionError({
-          path: isEditMode ? `properties/${property.id}` : 'properties',
-          operation: isEditMode ? 'update' : 'create',
-          requestResourceData: dataToSave,
-        }, auth);
-        errorEmitter.emit('permission-error', permissionError);
+       console.error("Unexpected error in handleSubmit:", error);
     } finally {
       setIsLoading(false);
     }
@@ -170,7 +188,8 @@ function PropertyForm({
 export function PropertyList({ properties: initialProperties }: { properties: Property[] }) {
   const [searchTerm, setSearchTerm] = React.useState('');
   const [activeTab, setActiveTab] = React.useState('all');
-  const [properties, setProperties] = React.useState(initialProperties);
+  const [properties, setProperties] = React.useState<Property[]>(initialProperties);
+  const [tenants, setTenants] = React.useState<Tenant[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
 
   const firestore = useFirestore();
@@ -183,8 +202,8 @@ export function PropertyList({ properties: initialProperties }: { properties: Pr
         return;
     };
     
-    const q = query(collection(firestore, 'properties'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    const propsQuery = query(collection(firestore, 'properties'));
+    const unsubProps = onSnapshot(propsQuery, (snapshot) => {
         const props = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Property));
         setProperties(props);
         setIsLoading(false);
@@ -197,7 +216,23 @@ export function PropertyList({ properties: initialProperties }: { properties: Pr
         setIsLoading(false);
     });
 
-    return () => unsubscribe();
+    const tenantsQuery = query(collection(firestore, 'tenants'));
+    const unsubTenants = onSnapshot(tenantsQuery, (snapshot) => {
+        const tenantData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Tenant));
+        setTenants(tenantData);
+    }, (error) => {
+        const permissionError = new FirestorePermissionError({
+            path: 'tenants',
+            operation: 'list',
+        }, auth);
+        errorEmitter.emit('permission-error', permissionError);
+    });
+
+
+    return () => {
+      unsubProps();
+      unsubTenants();
+    };
   }, [firestore, auth]);
 
   const handleDelete = async (property: Property) => {
@@ -225,11 +260,21 @@ export function PropertyList({ properties: initialProperties }: { properties: Pr
     return ['all', ...Array.from(groups).sort()];
   }, [properties]);
 
+  const tenantsByPropertyId = React.useMemo(() => {
+    return tenants.reduce((acc, tenant) => {
+        acc[tenant.propertyId] = tenant;
+        return acc;
+    }, {} as Record<string, Tenant>);
+  }, [tenants]);
 
   const filteredProperties = properties.filter(
     (property) => {
+      const tenant = tenantsByPropertyId[property.id];
+      const tenantName = tenant ? tenant.name : '';
       const matchesSearch = property.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                            property.address.toLowerCase().includes(searchTerm.toLowerCase());
+                            property.address.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                            tenantName.toLowerCase().includes(searchTerm.toLowerCase());
+
       const matchesTab = activeTab === 'all' || property.group === activeTab;
       return matchesSearch && matchesTab;
     }
@@ -241,7 +286,7 @@ export function PropertyList({ properties: initialProperties }: { properties: Pr
         <div className="relative w-full max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search properties..."
+            placeholder="Search by shop or tenant..."
             className="pl-9"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -261,43 +306,62 @@ export function PropertyList({ properties: initialProperties }: { properties: Pr
                 <div className="flex justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
            ) : filteredProperties.length > 0 ? (
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {filteredProperties.map((property) => (
-                <Card key={property.id} className="overflow-hidden flex flex-col">
-                   <div className="relative flex h-40 w-full items-center justify-center bg-muted">
-                    <Building className="h-16 w-16 text-muted-foreground/50" />
-                     <div className="absolute top-2 right-2">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button size="icon" variant="secondary" className="h-8 w-8 rounded-full bg-background/80 hover:bg-background">
-                              <MoreHorizontal className="h-4 w-4" />
-                              <span className="sr-only">Property actions</span>
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                             <PropertyForm property={property} onSave={() => {}} />
-                            <DropdownMenuItem 
-                                className="text-destructive focus:text-destructive focus:bg-destructive/10"
-                                onClick={() => handleDelete(property)}
-                            >
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                  </div>
-                  <CardHeader>
-                    <CardTitle>{property.group} - Shop {property.shopNumber}</CardTitle>
-                  </CardHeader>
-                  <CardContent className="flex-grow">
-                     <p className="text-sm text-muted-foreground">{property.name}</p>
-                     <p className="text-sm text-muted-foreground">{property.address}</p>
-                  </CardContent>
-                  <CardFooter>
-                    <p className="text-lg font-semibold">Pay Day: {property.paymentDay}</p>
-                  </CardFooter>
-                </Card>
-              ))}
+              {filteredProperties.map((property) => {
+                const tenant = tenantsByPropertyId[property.id];
+                const dueDate = tenant ? getDueDate(tenant) : null;
+                const isOverdue = dueDate ? new Date() > dueDate : false;
+                
+                return (
+                  <Card key={property.id} className="overflow-hidden flex flex-col">
+                     <div className="relative flex h-40 w-full items-center justify-center bg-muted">
+                      <Building className="h-16 w-16 text-muted-foreground/50" />
+                       <div className="absolute top-2 right-2">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button size="icon" variant="secondary" className="h-8 w-8 rounded-full bg-background/80 hover:bg-background">
+                                <MoreHorizontal className="h-4 w-4" />
+                                <span className="sr-only">Property actions</span>
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                               <PropertyForm property={property} onSave={() => {}} />
+                              <DropdownMenuItem 
+                                  className="text-destructive focus:text-destructive focus:bg-destructive/10"
+                                  onClick={() => handleDelete(property)}
+                              >
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                    </div>
+                    <CardHeader>
+                      <CardTitle>{property.name}</CardTitle>
+                    </CardHeader>
+                    <CardContent className="flex-grow space-y-2">
+                      {tenant && dueDate ? (
+                        <div className="flex items-center gap-3">
+                          <Avatar className="h-9 w-9">
+                              <AvatarFallback><User className="h-4 w-4" /></AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <div className="font-medium">{tenant.name}</div>
+                            <div className={`text-xs ${isOverdue ? 'text-destructive' : 'text-muted-foreground'}`}>
+                                {isOverdue ? 'Overdue' : 'Due'} {formatDistanceToNow(dueDate, { addSuffix: true })}
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="font-semibold text-primary">Vacant</div>
+                      )}
+                    </CardContent>
+                     <CardFooter>
+                        <p className="text-sm text-muted-foreground">Pay Day: {property.paymentDay}</p>
+                    </CardFooter>
+                  </Card>
+                )
+              })}
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/20 py-24 text-center">
