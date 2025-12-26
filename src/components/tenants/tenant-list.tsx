@@ -787,5 +787,3 @@ export function TenantList({ tenants: initialTenants }: { tenants: TenantWithDet
     </div>
   );
 }
-
-    
