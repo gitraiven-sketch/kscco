@@ -6,6 +6,7 @@ import {
   onSnapshot,
   query,
   getDocs,
+  addDoc,
 } from 'firebase/firestore';
 import {
   MoreHorizontal,
@@ -70,7 +71,7 @@ function AddTenantForm({ onTenantAdded, properties }: { onTenantAdded: () => voi
         name: formData.get('name') as string,
         phone: `+260${phone}`,
         propertyId: property.id,
-        rentAmount: Number(formData.get('rentAmount')),
+        rentAmount: property.rentAmount, // Set rent amount from property
         paymentDay: Number(formData.get('paymentDay')),
         leaseStartDate: formData.get('leaseStartDate') as string,
         lastPaidDate: new Date(formData.get('leaseStartDate') as string).toISOString(), // Assume paid on lease start
@@ -147,18 +148,6 @@ function AddTenantForm({ onTenantAdded, properties }: { onTenantAdded: () => voi
                 required 
                 className="col-span-3"
                 placeholder="e.g. Group A - Shop 1"
-              />
-            </div>
-             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="rentAmount" className="text-right">
-                Rent (K)
-              </Label>
-              <Input
-                id="rentAmount"
-                name="rentAmount"
-                type="number"
-                required
-                className="col-span-3"
               />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
