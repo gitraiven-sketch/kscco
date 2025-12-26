@@ -226,13 +226,19 @@ export function TenantList({ tenants: initialTenants }: { tenants: TenantWithDet
   const [isLoading, setIsLoading] = React.useState(true);
 
   React.useEffect(() => {
-    if (!firestore || !auth) return;
-    setIsLoading(true);
+    if (!firestore || !auth) {
+        setIsLoading(false);
+        return;
+    };
     
     const propsQuery = query(collection(firestore, 'properties'));
     const unsubProps = onSnapshot(propsQuery, (snapshot) => {
         const props = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Property));
         setProperties(props);
+        // If there are no properties, we can stop loading for tenants as well.
+        if (snapshot.empty) {
+            setIsLoading(false);
+        }
     }, (error) => {
         console.error("Error fetching properties:", error);
         const permissionError = new FirestorePermissionError({
@@ -240,15 +246,15 @@ export function TenantList({ tenants: initialTenants }: { tenants: TenantWithDet
             operation: 'list',
         }, auth);
         errorEmitter.emit('permission-error', permissionError);
+        setIsLoading(false);
     });
 
     return () => unsubProps();
   }, [firestore, auth]);
 
   React.useEffect(() => {
-    if (!firestore || !auth || properties.length === 0) {
-        // Don't fetch tenants until properties are loaded
-        // to avoid race conditions.
+    if (!firestore || !auth) {
+        setIsLoading(false);
         return;
     }
     
@@ -275,20 +281,23 @@ export function TenantList({ tenants: initialTenants }: { tenants: TenantWithDet
             
             const property = propertyMap.get(tenantData.propertyId);
             
-            if (!property) {
+            if (!property && properties.length > 0) { // Only warn if properties have loaded
                 console.warn(`Could not find property with ID: ${tenantData.propertyId} for tenant ${tenantData.name}`);
                 return null;
             }
 
             return {
                 ...tenantData,
-                property: property,
+                property: property!, // We might not have it yet, but that's okay
                 paymentStatus: paymentStatus,
                 dueDate: dueDate,
             };
         });
 
-        const tenantsData = (await Promise.all(tenantsDataPromises)).filter(Boolean) as TenantWithDetails[];
+        const tenantsData = (await Promise.all(tenantsDataPromises))
+            .filter(Boolean)
+            .filter(t => t.property) as TenantWithDetails[];
+
         setTenants(tenantsData);
         setIsLoading(false);
     },
@@ -326,7 +335,7 @@ export function TenantList({ tenants: initialTenants }: { tenants: TenantWithDet
         <AddTenantForm properties={properties} tenants={tenants} onTenantAdded={() => { /* data re-fetches automatically */ }} />
       </div>
 
-       {(isLoading && tenants.length === 0) ? (
+       {(isLoading) ? (
           <div className="flex h-64 w-full items-center justify-center rounded-lg border">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
