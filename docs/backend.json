@@ -34,6 +34,11 @@
           "type": "string",
           "format": "date",
           "description": "The start date of the lease."
+        },
+        "lastPaidDate": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The last date a payment was recorded for this tenant."
         }
       },
       "required": [
@@ -71,31 +76,6 @@
             }
         },
         "required": ["name", "group", "shopNumber", "address", "rentAmount"]
-    },
-    "Payment": {
-        "title": "Payment",
-        "description": "A rent payment made by a tenant.",
-        "type": "object",
-        "properties": {
-            "id": {
-                "type": "string"
-            },
-            "tenantId": {
-                "type": "string"
-            },
-            "amount": {
-                "type": "number"
-            },
-            "date": {
-                "type": "string",
-                "format": "date-time"
-            },
-            "receiptUrl": {
-                "type": "string",
-                "format": "uri",
-                "description": "A URL pointing to the uploaded receipt image."
-            }
-        }
     }
   },
   "auth": {
@@ -109,12 +89,6 @@
         "$ref": "#/entities/Tenant"
       },
       "description": "Collection of all tenants."
-    },
-    "/tenants/{tenantId}/payments/{paymentId}": {
-        "schema": {
-            "$ref": "#/entities/Payment"
-        },
-        "description": "Sub-collection of payments for a specific tenant."
     },
     "/properties/{propertyId}": {
         "schema": {

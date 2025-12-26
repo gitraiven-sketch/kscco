@@ -1,3 +1,4 @@
+
 import {
   SidebarProvider,
   Sidebar,
@@ -12,14 +13,11 @@ import {
   LayoutDashboard,
   Users,
   Building,
-  History,
   Bell,
-  Search,
 } from 'lucide-react';
 import Link from 'next/link';
 import AuthGuard from '@/components/auth/auth-guard';
 import { UserNav } from '@/components/auth/user-nav';
-import { Input } from '@/components/ui/input';
 
 function BuildingIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
@@ -107,17 +105,6 @@ export default function DashboardLayout({
                     <Link href="/reminders">
                       <Bell />
                       <span>Reminders</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    asChild
-                    tooltip={{ children: 'Payment History', side: 'right' }}
-                  >
-                    <Link href="/history">
-                      <History />
-                      <span>Payment History</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

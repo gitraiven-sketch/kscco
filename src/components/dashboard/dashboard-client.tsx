@@ -1,8 +1,9 @@
+
 'use client';
 
 import { useEffect, useState } from 'react';
 import { useAuth, useFirestore } from '@/firebase';
-import { collection, onSnapshot, getDocs, doc } from 'firebase/firestore';
+import { collection, onSnapshot, getDocs } from 'firebase/firestore';
 import type { Tenant, Property, PaymentStatus } from '@/lib/types';
 import {
   Card,
@@ -34,9 +35,9 @@ type DashboardData = {
   totalProperties: number;
   vacantProperties: number;
   statusCounts: {
-    paid: number;
-    overdue: number;
-    upcoming: number;
+    Paid: number;
+    Overdue: number;
+    Upcoming: number;
   };
 };
 
@@ -65,7 +66,7 @@ export function DashboardClient() {
     totalTenants: 0,
     totalProperties: 0,
     vacantProperties: 0,
-    statusCounts: { paid: 0, overdue: 0, upcoming: 0 },
+    statusCounts: { Paid: 0, Overdue: 0, Upcoming: 0 },
   });
 
   useEffect(() => {
@@ -74,60 +75,43 @@ export function DashboardClient() {
     const tenantsRef = collection(firestore, 'tenants');
     const propertiesRef = collection(firestore, 'properties');
 
-    const unsubTenants = onSnapshot(tenantsRef, async (tenantSnapshot) => {
-        const propSnapshot = await getDocs(propertiesRef).catch(error => {
-            const permissionError = new FirestorePermissionError({ path: propertiesRef.path, operation: 'list'}, auth);
-            errorEmitter.emit('permission-error', permissionError);
-            return null;
-        });
+    const unsubTenants = onSnapshot(tenantsRef, async () => {
+        try {
+            const tenantsWithDetails = await getTenantsWithDetails();
+            const propSnapshot = await getDocs(propertiesRef);
 
-        if (!propSnapshot) return;
+            const statusCounts = tenantsWithDetails.reduce((acc, tenant) => {
+                acc[tenant.paymentStatus] = (acc[tenant.paymentStatus] || 0) + 1;
+                return acc;
+            }, {} as Record<PaymentStatus, number>);
 
-        const tenantsWithDetails = await getTenantsWithDetails().catch(error => {
-            // This will catch errors from getProperties or getTenantsWithDetails
-            // which might be permission errors.
-             if (error.message.includes('permission')) {
-                // A bit of a guess, but better than nothing.
+            const occupiedPropertyIds = new Set(tenantsWithDetails.map(t => t.propertyId));
+            const vacantCount = propSnapshot.docs.filter(doc => !occupiedPropertyIds.has(doc.id)).length;
+            
+            setData({
+                totalTenants: tenantsWithDetails.length,
+                totalProperties: propSnapshot.size,
+                vacantProperties: vacantCount,
+                statusCounts: {
+                    Paid: statusCounts.Paid || 0,
+                    Overdue: statusCounts.Overdue || 0,
+                    Upcoming: statusCounts.Upcoming || 0,
+                }
+            });
+        } catch(e: any) {
+            if (e.message.includes('permission')) {
                 const permissionError = new FirestorePermissionError({ path: 'tenants or properties', operation: 'list' }, auth);
                 errorEmitter.emit('permission-error', permissionError);
-             }
-             return [];
-        });
-
-        const statusCounts = tenantsWithDetails.reduce((acc, tenant) => {
-            acc[tenant.paymentStatus] = (acc[tenant.paymentStatus] || 0) + 1;
-            return acc;
-        }, {} as Record<PaymentStatus, number>);
-
-
-        const occupiedPropertyIds = new Set(tenantSnapshot.docs.map(doc => (doc.data() as Tenant).propertyId));
-        const vacantCount = propSnapshot.docs.filter(doc => !occupiedPropertyIds.has(doc.id)).length;
-        
-        setData({
-            totalTenants: tenantSnapshot.size,
-            totalProperties: propSnapshot.size,
-            vacantProperties: vacantCount,
-            statusCounts: {
-                paid: statusCounts.Paid || 0,
-                overdue: statusCounts.Overdue || 0,
-                upcoming: statusCounts.Upcoming || 0,
             }
-        });
-
+        }
     }, (error) => {
         const permissionError = new FirestorePermissionError({ path: tenantsRef.path, operation: 'list' }, auth);
         errorEmitter.emit('permission-error', permissionError);
     });
 
     const unsubProperties = onSnapshot(propertiesRef, async (propSnapshot) => {
-        const tenantSnapshot = await getDocs(tenantsRef).catch(error => {
-            const permissionError = new FirestorePermissionError({ path: tenantsRef.path, operation: 'list' }, auth);
-            errorEmitter.emit('permission-error', permissionError);
-            return null;
-        });
-        if (!tenantSnapshot) return;
-
-        const occupiedPropertyIds = new Set(tenantSnapshot.docs.map(doc => (doc.data() as Tenant).propertyId));
+        const tenantsWithDetails = await getTenantsWithDetails();
+        const occupiedPropertyIds = new Set(tenantsWithDetails.map(t => t.propertyId));
         const vacantCount = propSnapshot.docs.filter(doc => !occupiedPropertyIds.has(doc.id)).length;
         
         setData(prevData => ({
@@ -149,9 +133,9 @@ export function DashboardClient() {
 
 
   const chartData = [
-    { name: 'paid', value: data.statusCounts.paid, fill: 'var(--color-paid)' },
-    { name: 'overdue', value: data.statusCounts.overdue, fill: 'var(--color-overdue)' },
-    { name: 'upcoming', value: data.statusCounts.upcoming, fill: 'var(--color-upcoming)' },
+    { name: 'paid', value: data.statusCounts.Paid, fill: 'var(--color-paid)' },
+    { name: 'overdue', value: data.statusCounts.Overdue, fill: 'var(--color-overdue)' },
+    { name: 'upcoming', value: data.statusCounts.Upcoming, fill: 'var(--color-upcoming)' },
   ].filter(item => item.value > 0);
 
   return (

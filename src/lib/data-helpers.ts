@@ -1,32 +1,33 @@
+
 // This file is now marked for client-side execution,
 // but can be used on the server as well.
 'use client'; 
 // Using 'use client' is a temporary workaround. Ideally, this would be refactored
 // to have distinct server and client data functions.
 
-import type { Tenant, Property, Payment, TenantWithDetails, PaymentStatus } from './types';
+import type { Tenant, Property, TenantWithDetails, PaymentStatus } from './types';
 import { getFirestore, collection, getDocs } from 'firebase/firestore';
 import { initializeFirebase } from '@/firebase';
 
-function getPaymentStatus(tenant: Tenant, allPayments: Payment[]): { status: PaymentStatus, dueDate: Date } {
+function getPaymentStatus(tenant: Tenant): { status: PaymentStatus, dueDate: Date } {
     const today = new Date();
-    const currentYear = today.getFullYear();
-    const currentMonth = today.getMonth();
-
-    const dueDate = new Date(currentYear, currentMonth, tenant.paymentDay);
+    const lastPaid = tenant.lastPaidDate ? new Date(tenant.lastPaidDate) : new Date(tenant.leaseStartDate);
     
-    const paymentForCurrentMonth = allPayments.find(p => 
-        p.tenantId === tenant.id &&
-        new Date(p.date).getMonth() === currentMonth &&
-        new Date(p.date).getFullYear() === currentYear
-    );
-
-    if (paymentForCurrentMonth) {
-        return { status: 'Paid', dueDate };
-    }
+    let dueDate = new Date(lastPaid.getFullYear(), lastPaid.getMonth(), tenant.paymentDay);
+    // The next due date is the month after the last payment was made.
+    dueDate.setMonth(dueDate.getMonth() + 1);
 
     if (today > dueDate) {
         return { status: 'Overdue', dueDate };
+    }
+    
+    const lastPaidYear = lastPaid.getFullYear();
+    const lastPaidMonth = lastPaid.getMonth();
+    const currentYear = today.getFullYear();
+    const currentMonth = today.getMonth();
+
+    if (lastPaidYear === currentYear && lastPaidMonth === currentMonth) {
+        return { status: 'Paid', dueDate };
     }
 
     return { status: 'Upcoming', dueDate };
@@ -56,23 +57,15 @@ export async function getTenantsWithDetails(): Promise<TenantWithDetails[]> {
         
         const propertyMap = new Map<string, Property>(properties.map(p => [p.id, p]));
 
-        const tenantsWithDetails: TenantWithDetails[] = [];
-
-        for (const tenant of tenantList) {
-            const paymentCollection = collection(firestore, 'tenants', tenant.id, 'payments');
-            const paymentSnapshot = await getDocs(paymentCollection);
-            const tenantPayments = paymentSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payment));
-            
-            const { status, dueDate } = getPaymentStatus(tenant, tenantPayments);
-
-            tenantsWithDetails.push({
+        const tenantsWithDetails: TenantWithDetails[] = tenantList.map(tenant => {
+            const { status, dueDate } = getPaymentStatus(tenant);
+            return {
                 ...tenant,
                 property: propertyMap.get(tenant.propertyId)!,
                 paymentStatus: status,
                 dueDate,
-                payments: tenantPayments.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
-            });
-        }
+            };
+        });
         
         return tenantsWithDetails;
 

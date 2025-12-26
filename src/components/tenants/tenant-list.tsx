@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -41,11 +42,10 @@ import {
   Mail,
   CheckCircle,
 } from 'lucide-react';
-import type { TenantWithDetails, PaymentStatus, Tenant, Property, Payment } from '@/lib/types';
-import { format } from 'date-fns';
+import type { TenantWithDetails, PaymentStatus, Tenant, Property } from '@/lib/types';
+import { format, formatDistanceToNow, differenceInDays } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { generateRentReminder } from '@/ai/flows/automated-rent-reminders';
-import { generateReceiptEmail } from '@/ai/flows/payment-receipt-email';
 import { useAuth, useFirestore } from '@/firebase';
 import {
   Dialog,
@@ -61,136 +61,40 @@ import { Label } from '@/components/ui/label';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 
-
 const statusStyles: Record<PaymentStatus, string> = {
   Paid: 'bg-green-100 text-green-800 border-green-200',
   Overdue: 'bg-red-100 text-red-800 border-red-200',
   Upcoming: 'bg-blue-100 text-blue-800 border-blue-200',
 };
 
-function RecordPaymentForm({ tenant, onPaymentAdded }: { tenant: Tenant, onPaymentAdded: (paymentId: string) => void }) {
-  const firestore = useFirestore();
-  const auth = useAuth();
-  const { toast } = useToast();
-  const [isLoading, setIsLoading] = React.useState(false);
-  const [open, setOpen] = React.useState(false);
-  const [amount, setAmount] = React.useState(tenant.rentAmount);
-  const [date, setDate] = React.useState(new Date().toISOString().split('T')[0]);
-  const [receiptUrl, setReceiptUrl] = React.useState('');
+function Countdown({ dueDate }: { dueDate: Date }) {
+  const [countdown, setCountdown] = React.useState('');
 
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!firestore || !auth) return;
+  React.useEffect(() => {
+    const updateCountdown = () => {
+      const now = new Date();
+      const diff = differenceInDays(dueDate, now);
 
-    setIsLoading(true);
-    
-    const newPayment: Omit<Payment, 'id'> = {
-      tenantId: tenant.id,
-      amount: Number(amount),
-      date: new Date(date).toISOString(),
+      if (diff < -30) { // More than a month overdue
+        setCountdown('Overdue');
+      } else if (diff < 0) {
+        setCountdown(`${Math.abs(diff)}d overdue`);
+      } else if (diff === 0) {
+        setCountdown('Due today');
+      } else {
+        setCountdown(`Due in ${diff}d`);
+      }
     };
-    if (receiptUrl) {
-        newPayment.receiptUrl = receiptUrl;
-    }
 
-    const paymentsRef = collection(firestore, 'tenants', tenant.id, 'payments');
-    addDoc(paymentsRef, newPayment)
-      .then((docRef) => {
-        toast({
-          title: 'Payment Recorded',
-          description: `Payment of K${amount} for ${tenant.name} has been recorded.`,
-        });
-        onPaymentAdded(docRef.id);
-        setOpen(false);
-      })
-      .catch((error) => {
-        const permissionError = new FirestorePermissionError({
-          path: paymentsRef.path,
-          operation: 'create',
-          requestResourceData: newPayment,
-        }, auth);
-        errorEmitter.emit('permission-error', permissionError);
-      })
-      .finally(() => {
-        setIsLoading(false);
-      });
-  };
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 1000 * 60 * 60); // Update every hour
 
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-          Record Custom Payment
-        </DropdownMenuItem>
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
-        <form onSubmit={handleSubmit}>
-          <DialogHeader>
-            <DialogTitle>Record Payment for {tenant.name}</DialogTitle>
-            <DialogDescription>
-              Enter the details of the payment received.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="amount" className="text-right">
-                Amount (K)
-              </Label>
-              <Input
-                id="amount"
-                name="amount"
-                type="number"
-                value={amount}
-                onChange={(e) => setAmount(Number(e.target.value))}
-                required
-                className="col-span-3"
-              />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="date" className="text-right">
-                Payment Date
-              </Label>
-              <Input
-                id="date"
-                name="date"
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                required
-                className="col-span-3"
-              />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="receiptUrl" className="text-right">
-                Receipt URL
-              </Label>
-              <Input
-                id="receiptUrl"
-                name="receiptUrl"
-                type="text"
-                placeholder="https://example.com/receipt.pdf"
-                value={receiptUrl}
-                onChange={(e) => setReceiptUrl(e.target.value)}
-                className="col-span-3"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button type="button" variant="secondary">
-                Cancel
-              </Button>
-            </DialogClose>
-            <Button type="submit" disabled={isLoading}>
-              {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Save Payment
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
+    return () => clearInterval(interval);
+  }, [dueDate]);
+
+  return <span>{countdown}</span>;
 }
+
 
 function EditTenantForm({ tenant, onTenantUpdated, properties }: { tenant: TenantWithDetails, onTenantUpdated: () => void, properties: Property[] }) {
   const firestore = useFirestore();
@@ -217,12 +121,13 @@ function EditTenantForm({ tenant, onTenantUpdated, properties }: { tenant: Tenan
     setIsLoading(true);
     const tenantRef = doc(firestore, 'tenants', tenant.id);
     
-    const { id, property, paymentStatus, dueDate, payments, propertyName, ...updateData } = {
+    const { id, property, paymentStatus, dueDate, propertyName, ...updateData } = {
         ...editedTenant,
         phone: editedTenant.phone.startsWith('+260') ? editedTenant.phone : `+260${editedTenant.phone.replace(/^0/, '')}`
     };
 
-    const targetProperty = properties.find(p => p.name.toLowerCase() === propertyName.toLowerCase());
+    const targetProperty = properties.find(p => p.name.toLowerCase() === propertyName.toLowerCase() || p.name.toLowerCase().replace(/ /g, '') === propertyName.toLowerCase().replace(/ /g, ''));
+
 
     if (!targetProperty) {
       toast({
@@ -296,7 +201,7 @@ function EditTenantForm({ tenant, onTenantUpdated, properties }: { tenant: Tenan
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="propertyName" className="text-right">Property</Label>
-              <Input id="propertyName" name="propertyName" value={editedTenant.propertyName} onChange={handleChange} required className="col-span-3" placeholder="e.g. Group A - Shop 1"/>
+              <Input id="propertyName" name="propertyName" value={editedTenant.propertyName} onChange={handleChange} required className="col-span-3" placeholder="e.g. B1, A1, Group C - Shop 5"/>
             </div>
              <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="rentAmount" className="text-right">Rent (K)</Label>
@@ -356,6 +261,7 @@ function AddTenantForm({ onTenantAdded, properties }: { onTenantAdded: () => voi
         rentAmount: Number(formData.get('rentAmount')),
         paymentDay: Number(formData.get('paymentDay')),
         leaseStartDate: formData.get('leaseStartDate') as string,
+        lastPaidDate: new Date(formData.get('leaseStartDate') as string).toISOString(), // Assume paid on lease start
     };
 
     const tenantsRef = collection(firestore, 'tenants');
@@ -501,7 +407,6 @@ export function TenantList({ tenants: initialTenants }: { tenants: TenantWithDet
     
     const unsubTenants = onSnapshot(tenantsQuery, async (tenantsSnapshot) => {
         const propertyMap = new Map<string, Property>();
-        // We can get properties from the state now that it's updated by its own listener
         const propsSnapshot = await getDocs(propertiesQuery);
         propsSnapshot.forEach(doc => {
             propertyMap.set(doc.id, { id: doc.id, ...doc.data() } as Property);
@@ -510,33 +415,31 @@ export function TenantList({ tenants: initialTenants }: { tenants: TenantWithDet
         const tenantsDataPromises = tenantsSnapshot.docs.map(async (tenantDoc) => {
             const tenantData = { id: tenantDoc.id, ...tenantDoc.data() } as Tenant;
             
-            const paymentsQuery = query(collection(firestore, 'tenants', tenantDoc.id, 'payments'));
-            const paymentsSnapshot = await getDocs(paymentsQuery);
-            const tenantPayments = paymentsSnapshot.docs.map(doc => ({id: doc.id, ...doc.data() } as Payment));
-
             const today = new Date();
-            const currentYear = today.getFullYear();
-            const currentMonth = today.getMonth();
-            const dueDate = new Date(currentYear, currentMonth, tenantData.paymentDay);
+            let currentYear = today.getFullYear();
+            let currentMonth = today.getMonth();
 
-            const paymentForCurrentMonth = tenantPayments.find(p => 
-                new Date(p.date).getMonth() === currentMonth &&
-                new Date(p.date).getFullYear() === currentYear
-            );
+            const lastPaid = tenantData.lastPaidDate ? new Date(tenantData.lastPaidDate) : new Date(tenantData.leaseStartDate);
+            const lastPaidYear = lastPaid.getFullYear();
+            const lastPaidMonth = lastPaid.getMonth();
             
-            let paymentStatus: PaymentStatus = 'Upcoming';
-            if (paymentForCurrentMonth) {
-                paymentStatus = 'Paid';
-            } else if (today > dueDate) {
-                paymentStatus = 'Overdue';
-            }
+            let dueDate = new Date(lastPaidYear, lastPaidMonth, tenantData.paymentDay);
+            // Move to next month's due date
+            dueDate.setMonth(dueDate.getMonth() + 1);
 
+
+            let paymentStatus: PaymentStatus = 'Upcoming';
+            if (today > dueDate) {
+              paymentStatus = 'Overdue';
+            } else if (lastPaidYear === currentYear && lastPaidMonth === currentMonth) {
+              paymentStatus = 'Paid';
+            }
+            
             return {
                 ...tenantData,
                 property: propertyMap.get(tenantData.propertyId)!,
                 paymentStatus: paymentStatus,
                 dueDate: dueDate,
-                payments: tenantPayments.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
             };
         });
 
@@ -602,66 +505,25 @@ export function TenantList({ tenants: initialTenants }: { tenants: TenantWithDet
         });
     }
   }
-  
-  const handleSendReceipt = async (tenant: TenantWithDetails, paymentId: string) => {
-    const payment = tenant.payments.find(p => p.id === paymentId);
-    if (!payment) {
-        toast({ variant: 'destructive', title: 'Error', description: 'Payment not found.' });
-        return;
-    }
-    
-    toast({ title: 'Generating Receipt Email...', description: `Preparing email for ${tenant.name}.` });
-    
-    try {
-        const result = await generateReceiptEmail({
-            tenantName: tenant.name,
-            propertyName: tenant.property.name,
-            paymentAmount: payment.amount,
-            paymentDate: format(new Date(payment.date), 'do MMMM, yyyy'),
-            receiptUrl: payment.receiptUrl,
-        });
-
-        // The email field is removed, so we can't send an email.
-        // For now, let's just show the generated content in a toast.
-        toast({
-            title: 'Email Content Generated',
-            description: "Email functionality is disabled as the tenant email field has been removed.",
-        });
-
-
-    } catch (error) {
-        console.error('Failed to generate receipt email:', error);
-        toast({
-            variant: 'destructive',
-            title: 'Error',
-            description: 'Could not generate the receipt email.',
-        });
-    }
-  }
 
   const handleMarkAsPaid = async (tenant: TenantWithDetails) => {
     if (!firestore || !auth) return;
 
-    const newPayment: Omit<Payment, 'id'> = {
-      tenantId: tenant.id,
-      amount: tenant.rentAmount,
-      date: new Date().toISOString(),
-    };
+    const tenantRef = doc(firestore, 'tenants', tenant.id);
+    const updateData = { lastPaidDate: new Date().toISOString() };
 
-    const paymentsRef = collection(firestore, 'tenants', tenant.id, 'payments');
-    addDoc(paymentsRef, newPayment)
-      .then((docRef) => {
+    updateDoc(tenantRef, updateData)
+      .then(() => {
         toast({
           title: 'Payment Recorded',
           description: `Payment for ${tenant.name} has been recorded.`,
         });
-        handleSendReceipt(tenant, docRef.id);
       })
       .catch((error) => {
         const permissionError = new FirestorePermissionError({
-          path: paymentsRef.path,
-          operation: 'create',
-          requestResourceData: newPayment,
+          path: tenantRef.path,
+          operation: 'update',
+          requestResourceData: updateData
         }, auth);
         errorEmitter.emit('permission-error', permissionError);
       });
@@ -671,19 +533,11 @@ export function TenantList({ tenants: initialTenants }: { tenants: TenantWithDet
     if (!firestore || !auth) return;
     const tenantDocRef = doc(firestore, 'tenants', tenantId);
     
-    const paymentsRef = collection(firestore, 'tenants', tenantId, 'payments');
-    const paymentsSnapshot = await getDocs(paymentsRef);
-    const batch = writeBatch(firestore);
-    paymentsSnapshot.forEach(doc => {
-      batch.delete(doc.ref);
-    });
-    
     try {
-      await batch.commit();
       await deleteDoc(tenantDocRef);
       toast({
           title: "Tenant Deleted",
-          description: "The tenant and all their payment records have been removed.",
+          description: "The tenant has been removed.",
       });
     } catch (error) {
       const permissionError = new FirestorePermissionError({
@@ -717,7 +571,7 @@ export function TenantList({ tenants: initialTenants }: { tenants: TenantWithDet
               <TableHead>Property</TableHead>
               <TableHead>Rent Amount</TableHead>
               <TableHead>Payment Status</TableHead>
-              <TableHead>Lease Start Date</TableHead>
+              <TableHead>Due Date</TableHead>
               <TableHead>
                 <span className="sr-only">Actions</span>
               </TableHead>
@@ -753,7 +607,9 @@ export function TenantList({ tenants: initialTenants }: { tenants: TenantWithDet
                       {tenant.paymentStatus}
                     </Badge>
                   </TableCell>
-                  <TableCell>{format(new Date(tenant.leaseStartDate), 'PP')}</TableCell>
+                  <TableCell>
+                    <Countdown dueDate={tenant.dueDate} />
+                  </TableCell>
                   <TableCell>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -768,7 +624,6 @@ export function TenantList({ tenants: initialTenants }: { tenants: TenantWithDet
                           <CheckCircle className="mr-2 h-4 w-4" />
                           Mark as Paid
                         </DropdownMenuItem>
-                        <RecordPaymentForm tenant={tenant} onPaymentAdded={(paymentId) => handleSendReceipt(tenant, paymentId)} />
                         <EditTenantForm tenant={tenant} properties={properties} onTenantUpdated={() => { /* re-fetch handled by snapshot */ }}/>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem onSelect={() => handleSendReminder(tenant)} disabled={tenant.paymentStatus !== 'Overdue'}>

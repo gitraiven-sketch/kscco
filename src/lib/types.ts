@@ -1,3 +1,4 @@
+
 export type Tenant = {
   id: string;
   name: string;
@@ -6,6 +7,7 @@ export type Tenant = {
   rentAmount: number;
   paymentDay: number; // Day of the month rent is due
   leaseStartDate: string;
+  lastPaidDate?: string; // ISO date string
 };
 
 export type Property = {
@@ -17,19 +19,10 @@ export type Property = {
   rentAmount: number;
 };
 
-export type Payment = {
-  id: string;
-  tenantId: string;
-  amount: number;
-  date: string; // ISO date string
-  receiptUrl?: string;
-};
-
 export type PaymentStatus = 'Paid' | 'Overdue' | 'Upcoming';
 
 export type TenantWithDetails = Tenant & {
   property: Property;
   paymentStatus: PaymentStatus;
   dueDate: Date;
-  payments: Payment[];
 };
