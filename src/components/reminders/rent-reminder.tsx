@@ -34,11 +34,12 @@ type CategorizedTenants = {
 
 function TenantReminderCard({ tenant, proximity }: { tenant: TenantWithDetails, proximity: string }) {
   const [isLoading, setIsLoading] = React.useState(false);
+  const [message, setMessage] = React.useState<string | null>(null);
   const { toast } = useToast();
 
-  const handleSendReminder = async () => {
+  const handleGenerateReminder = async () => {
     setIsLoading(true);
-
+    setMessage(null);
     try {
       const result = await generateSingleRentReminder({
         tenantName: tenant.name,
@@ -48,26 +49,28 @@ function TenantReminderCard({ tenant, proximity }: { tenant: TenantWithDetails, 
         phoneNumber: tenant.phone,
         dueDateProximity: proximity,
       });
-
-      const whatsappLink = `https://wa.me/${tenant.phone.replace('+', '')}?text=${encodeURIComponent(result.message)}`;
-      window.open(whatsappLink, '_blank');
-
+      setMessage(result.message);
       toast({
-        title: 'Reminder Sent',
-        description: `Message for ${tenant.name} has been prepared.`,
+        title: 'Reminder Generated',
+        description: `Message for ${tenant.name} has been created.`,
       });
     } catch (error) {
-      console.error('Failed to generate and send reminder:', error);
+      console.error('Failed to generate reminder:', error);
       toast({
         variant: 'destructive',
-        title: 'Action Failed',
-        description: 'Could not generate or send the reminder message.',
+        title: 'Generation Failed',
+        description: 'Could not generate the reminder message.',
       });
     } finally {
       setIsLoading(false);
     }
   };
 
+  const handleSendReminder = () => {
+    if (!message) return;
+    const whatsappLink = `https://wa.me/${tenant.phone.replace('+', '')}?text=${encodeURIComponent(message)}`;
+    window.open(whatsappLink, '_blank');
+  };
 
   return (
     <Card className="flex flex-col">
@@ -82,14 +85,21 @@ function TenantReminderCard({ tenant, proximity }: { tenant: TenantWithDetails, 
         </div>
       </CardHeader>
        <CardContent className="flex-grow space-y-2">
-         <p className="text-sm text-muted-foreground italic">
-            Click the button below to generate a personalized reminder and send it via WhatsApp.
-         </p>
+        {message ? (
+          <Textarea value={message} readOnly rows={4} className="bg-muted" />
+        ) : (
+          <p className="text-sm text-muted-foreground italic">
+            Click "Generate Reminder" to create a personalized WhatsApp message.
+          </p>
+        )}
       </CardContent>
-      <CardFooter className="flex justify-end">
-        <Button size="sm" onClick={handleSendReminder} disabled={isLoading}>
+      <CardFooter className="flex justify-end gap-2">
+        <Button size="sm" variant="outline" onClick={handleGenerateReminder} disabled={isLoading}>
            {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
-          Send Reminder
+          {message ? 'Regenerate' : 'Generate'}
+        </Button>
+        <Button size="sm" onClick={handleSendReminder} disabled={!message || isLoading}>
+          Send via WhatsApp
         </Button>
       </CardFooter>
     </Card>

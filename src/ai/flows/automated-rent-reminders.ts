@@ -2,7 +2,7 @@
 /**
  * @fileOverview A flow for generating personalized WhatsApp messages to tenants reminding them about upcoming rent payments.
  *
- * - generateSingleRentReminder - A function that generates a single rent reminder message for one-click sending.
+ * - generateSingleRentReminder - A function that generates a single rent reminder message.
  * - RentReminderInput - The input type for the function.
  * - RentReminderOutput - The return type for the function.
  */
@@ -27,7 +27,6 @@ export type RentReminderOutput = z.infer<typeof RentReminderOutputSchema>;
 
 /**
  * Generates a single, personalized rent reminder message.
- * This flow is optimized for a one-click "generate and send" action.
  */
 export async function generateSingleRentReminder(input: RentReminderInput): Promise<RentReminderOutput> {
   return generateRentReminderFlow(input);
