@@ -19,7 +19,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import type { TenantWithDetails } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
-import { generateRentReminder } from '@/ai/flows/automated-rent-reminders';
+import { generateSingleRentReminder } from '@/ai/flows/automated-rent-reminders';
 import { generateAdminOverdueNotice } from '@/ai/flows/admin-overdue-notice';
 import { format, formatDistanceToNowStrict } from 'date-fns';
 import { Loader2, Wand2, User, Building, AlertTriangle, Mail } from 'lucide-react';
@@ -33,16 +33,14 @@ type CategorizedTenants = {
 }
 
 function TenantReminderCard({ tenant, proximity }: { tenant: TenantWithDetails, proximity: string }) {
-  const [generatedMessage, setGeneratedMessage] = React.useState('');
   const [isLoading, setIsLoading] = React.useState(false);
   const { toast } = useToast();
 
-  const handleGenerateReminder = async () => {
+  const handleSendReminder = async () => {
     setIsLoading(true);
-    setGeneratedMessage('');
 
     try {
-      const result = await generateRentReminder({
+      const result = await generateSingleRentReminder({
         tenantName: tenant.name,
         propertyName: tenant.property.name,
         rentAmount: tenant.rentAmount,
@@ -50,28 +48,26 @@ function TenantReminderCard({ tenant, proximity }: { tenant: TenantWithDetails, 
         phoneNumber: tenant.phone,
         dueDateProximity: proximity,
       });
-      setGeneratedMessage(result.message);
+
+      const whatsappLink = `https://wa.me/${tenant.phone.replace('+', '')}?text=${encodeURIComponent(result.message)}`;
+      window.open(whatsappLink, '_blank');
+
       toast({
-        title: 'Reminder Generated',
-        description: `Message for ${tenant.name} is ready.`,
+        title: 'Reminder Sent',
+        description: `Message for ${tenant.name} has been prepared.`,
       });
     } catch (error) {
-      console.error('Failed to generate reminder:', error);
+      console.error('Failed to generate and send reminder:', error);
       toast({
         variant: 'destructive',
-        title: 'Generation Failed',
-        description: 'Could not generate the reminder message.',
+        title: 'Action Failed',
+        description: 'Could not generate or send the reminder message.',
       });
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleSend = () => {
-    if (!generatedMessage) return;
-    const whatsappLink = `https://wa.me/${tenant.phone.replace('+', '')}?text=${encodeURIComponent(generatedMessage)}`;
-    window.open(whatsappLink, '_blank');
-  };
 
   return (
     <Card className="flex flex-col">
@@ -85,23 +81,15 @@ function TenantReminderCard({ tenant, proximity }: { tenant: TenantWithDetails, 
             <div className="text-xs text-muted-foreground">{format(tenant.dueDate, 'do MMM')}</div>
         </div>
       </CardHeader>
-      <CardContent className="flex-grow space-y-2">
-         <Textarea
-            id={`message-${tenant.id}`}
-            placeholder="AI-generated message will appear here..."
-            value={generatedMessage}
-            onChange={(e) => setGeneratedMessage(e.target.value)}
-            rows={5}
-            className="bg-muted/40 text-sm"
-          />
+       <CardContent className="flex-grow space-y-2">
+         <p className="text-sm text-muted-foreground italic">
+            Click the button below to generate a personalized reminder and send it via WhatsApp.
+         </p>
       </CardContent>
-      <CardFooter className="flex justify-between">
-        <Button size="sm" variant="outline" onClick={handleGenerateReminder} disabled={isLoading}>
-          {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
-          Generate
-        </Button>
-        <Button size="sm" onClick={handleSend} disabled={!generatedMessage}>
-          Send via WhatsApp
+      <CardFooter className="flex justify-end">
+        <Button size="sm" onClick={handleSendReminder} disabled={isLoading}>
+           {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
+          Send Reminder
         </Button>
       </CardFooter>
     </Card>
