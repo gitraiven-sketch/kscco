@@ -324,26 +324,30 @@ export function PropertyList({ properties: initialProperties }: { properties: Pr
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-4">
-        <div className="relative w-full max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search by shop or tenant..."
-            className="pl-9"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+      <div className="sticky top-[57px] z-10 space-y-4 bg-background pb-4 pt-2">
+        <div className="flex items-center justify-between gap-4">
+          <div className="relative w-full max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by shop or tenant..."
+              className="pl-9"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <PropertyForm onSave={() => { /* No-op, handled by snapshot */ }} />
         </div>
-        <PropertyForm onSave={() => { /* No-op, handled by snapshot */ }} />
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList>
+            {propertyGroups.map(group => (
+              <TabsTrigger key={group} value={group}>{group === 'all' ? 'All Shops': group}</TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList>
-          {propertyGroups.map(group => (
-            <TabsTrigger key={group} value={group}>{group === 'all' ? 'All Shops': group}</TabsTrigger>
-          ))}
-        </TabsList>
-        <TabsContent value={activeTab} className="mt-4">
+        <TabsContent value={activeTab} className="mt-0">
            {isLoading ? (
                 <div className="flex justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
            ) : filteredProperties.length > 0 ? (

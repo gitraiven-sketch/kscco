@@ -296,18 +296,34 @@ export function TenantList({ tenants: initialTenants }: { tenants: TenantWithDet
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-4">
-        <div className="relative w-full max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search tenants or properties..."
-            className="pl-9"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+      <div className="sticky top-[57px] z-10 space-y-4 bg-background pb-4 pt-2">
+        <div className="flex items-center justify-between gap-4">
+            <div className="relative w-full max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+                placeholder="Search tenants or properties..."
+                className="pl-9"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+            />
+            </div>
+            <AddTenantForm properties={properties} tenants={tenants} onTenantAdded={() => { /* data re-fetches automatically */ }} />
         </div>
-        <AddTenantForm properties={properties} tenants={tenants} onTenantAdded={() => { /* data re-fetches automatically */ }} />
+
+        {tenants.length > 0 && (
+             <Tabs defaultValue={defaultTab} className="w-full">
+                <TabsList>
+                    {groupOrder.map(groupName => {
+                    if(groupedTenants[groupName] && groupedTenants[groupName].length > 0) {
+                        return <TabsTrigger key={groupName} value={groupName}>{groupName}</TabsTrigger>
+                    }
+                    return null;
+                    })}
+                </TabsList>
+             </Tabs>
+        )}
       </div>
+
 
        {isLoading ? (
             <div className="flex h-64 w-full items-center justify-center rounded-lg border">
@@ -315,20 +331,12 @@ export function TenantList({ tenants: initialTenants }: { tenants: TenantWithDet
             </div>
         ) : tenants.length > 0 ? (
             <Tabs defaultValue={defaultTab} className="w-full">
-              <TabsList>
-                {groupOrder.map(groupName => {
-                  if(groupedTenants[groupName] && groupedTenants[groupName].length > 0) {
-                    return <TabsTrigger key={groupName} value={groupName}>{groupName}</TabsTrigger>
-                  }
-                  return null;
-                })}
-              </TabsList>
               {groupOrder.map(groupName => {
                   const tenantsInGroup = groupedTenants[groupName];
                   if (!tenantsInGroup || tenantsInGroup.length === 0) return null;
                   
                   return (
-                    <TabsContent value={groupName} key={groupName}>
+                    <TabsContent value={groupName} key={groupName} className="mt-0">
                         <Table>
                             <TableHeader>
                             <TableRow>
