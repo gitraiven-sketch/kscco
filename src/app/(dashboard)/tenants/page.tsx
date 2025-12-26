@@ -6,6 +6,7 @@ import {
 } from '@/components/ui/card';
 
 export default async function TenantsPage() {
+  // This initial data will be replaced by the live Firestore data on the client.
   const tenants = await getTenantsWithDetails();
 
   return (
