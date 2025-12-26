@@ -33,7 +33,7 @@ import {
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore, useAuth } from '@/firebase';
-import { collection, onSnapshot, doc, updateDoc, addDoc, deleteDoc, query } from 'firebase/firestore';
+import { collection, onSnapshot, doc, updateDoc, addDoc, deleteDoc, query, writeBatch } from 'firebase/firestore';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { Avatar, AvatarFallback } from '../ui/avatar';
@@ -94,11 +94,15 @@ function PropertyForm({
   const [isLoading, setIsLoading] = React.useState(false);
   const [open, setOpen] = React.useState(false);
   
+  const isEditMode = !!property;
+
   const [formData, setFormData] = React.useState(
     property || {
       name: '',
       group: 'Group A',
       shopNumber: 0,
+      startShopNumber: 1,
+      endShopNumber: 5,
       address: 'Kabwata Shopping Complex, Lusaka',
       paymentDay: 1,
     }
@@ -111,6 +115,8 @@ function PropertyForm({
           name: '',
           group: 'Group A',
           shopNumber: 0,
+          startShopNumber: 1,
+          endShopNumber: 5,
           address: 'Kabwata Shopping Complex, Lusaka',
           paymentDay: 1,
         }
@@ -119,13 +125,11 @@ function PropertyForm({
   }, [open, property]);
 
 
-  const isEditMode = !!property;
-
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ 
         ...prev, 
-        [name]: (name === 'shopNumber' || name === 'paymentDay') ? (value === '' ? 0 : parseInt(value, 10)) : value
+        [name]: ['shopNumber', 'paymentDay', 'startShopNumber', 'endShopNumber'].includes(name) ? (value === '' ? 0 : parseInt(value, 10)) : value
     }));
   };
 
@@ -134,36 +138,59 @@ function PropertyForm({
     if (!firestore || !auth) return;
     setIsLoading(true);
     
-    const dataToSave = {
-        ...formData,
-        shopNumber: Number(formData.shopNumber),
-        paymentDay: Number(formData.paymentDay),
-    };
-
-
     try {
-      if (isEditMode) {
-        const propRef = doc(firestore, 'properties', property.id);
-        await updateDoc(propRef, dataToSave);
-        toast({
-          title: 'Property Updated',
-          description: `${formData.name} has been successfully updated.`,
-        });
-      } else {
-        await addDoc(collection(firestore, 'properties'), dataToSave);
-        toast({
-          title: 'Property Added',
-          description: `${formData.name} has been successfully added.`,
-        });
-      }
-      onSave();
-      setOpen(false);
+        if (isEditMode && property) {
+            const dataToSave = {
+                name: formData.name,
+                group: formData.group,
+                shopNumber: Number(formData.shopNumber),
+                address: formData.address,
+                paymentDay: Number(formData.paymentDay),
+            };
+            const propRef = doc(firestore, 'properties', property.id);
+            await updateDoc(propRef, dataToSave);
+            toast({
+                title: 'Property Updated',
+                description: `${formData.name} has been successfully updated.`,
+            });
+        } else {
+            const { startShopNumber, endShopNumber, group, address, paymentDay } = formData;
+            if (startShopNumber <= 0 || endShopNumber <= 0 || endShopNumber < startShopNumber) {
+                toast({ variant: 'destructive', title: 'Invalid Shop Range', description: 'Please enter a valid start and end shop number.'});
+                setIsLoading(false);
+                return;
+            }
+
+            const batch = writeBatch(firestore);
+            const propertiesCollection = collection(firestore, 'properties');
+
+            for (let i = startShopNumber; i <= endShopNumber; i++) {
+                const newProperty = {
+                    name: `${group} - Shop ${i}`,
+                    group,
+                    shopNumber: i,
+                    address,
+                    paymentDay,
+                };
+                const newDocRef = doc(propertiesCollection);
+                batch.set(newDocRef, newProperty);
+            }
+            
+            await batch.commit();
+
+            toast({
+                title: 'Properties Added',
+                description: `Shops from ${startShopNumber} to ${endShopNumber} in ${group} have been added.`,
+            });
+        }
+
+        onSave();
+        setOpen(false);
     } catch(error) {
        console.error("Error saving property:", error);
        const permissionError = new FirestorePermissionError({
-          path: isEditMode ? `properties/${property.id}` : 'properties',
+          path: isEditMode ? `properties/${property!.id}` : 'properties',
           operation: isEditMode ? 'update' : 'create',
-          requestResourceData: dataToSave,
         }, auth);
         errorEmitter.emit('permission-error', permissionError);
     } finally {
@@ -188,22 +215,37 @@ function PropertyForm({
           <DialogHeader>
             <DialogTitle>{isEditMode ? 'Edit' : 'Add'} Property</DialogTitle>
             <DialogDescription>
-              {isEditMode ? 'Update the details for this property.' : 'Enter details for the new property.'}
+              {isEditMode ? 'Update the details for this property.' : 'Enter details for the new properties.'}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="name" className="text-right">Name</Label>
-              <Input id="name" name="name" value={formData.name} onChange={handleChange} required className="col-span-3" />
-            </div>
+             {isEditMode ? (
+                <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="name" className="text-right">Name</Label>
+                    <Input id="name" name="name" value={formData.name} onChange={handleChange} required className="col-span-3" />
+                </div>
+             ) : (
+                <>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="startShopNumber" className="text-right">Start Shop</Label>
+                        <Input id="startShopNumber" name="startShopNumber" type="number" value={formData.startShopNumber} onChange={handleChange} required className="col-span-3" />
+                    </div>
+                     <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="endShopNumber" className="text-right">End Shop</Label>
+                        <Input id="endShopNumber" name="endShopNumber" type="number" value={formData.endShopNumber} onChange={handleChange} required className="col-span-3" />
+                    </div>
+                </>
+             )}
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="group" className="text-right">Group</Label>
               <Input id="group" name="group" value={formData.group} onChange={handleChange} required className="col-span-3" />
             </div>
-             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="shopNumber" className="text-right">Shop No.</Label>
-              <Input id="shopNumber" name="shopNumber" type="number" value={formData.shopNumber} onChange={handleChange} required className="col-span-3" />
-            </div>
+             {isEditMode && (
+                <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="shopNumber" className="text-right">Shop No.</Label>
+                    <Input id="shopNumber" name="shopNumber" type="number" value={formData.shopNumber} onChange={handleChange} required className="col-span-3" />
+                </div>
+             )}
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="paymentDay" className="text-right">Pay Day</Label>
               <Input id="paymentDay" name="paymentDay" type="number" min="1" max="31" value={formData.paymentDay} onChange={handleChange} required className="col-span-3" />
