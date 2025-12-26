@@ -1,7 +1,11 @@
-'use server';
+// This file is now marked for client-side execution,
+// but can be used on the server as well.
+'use client'; 
+// Using 'use client' is a temporary workaround. Ideally, this would be refactored
+// to have distinct server and client data functions.
 
 import type { Tenant, Property, Payment, TenantWithDetails, PaymentStatus } from './types';
-import { getFirestore, collection, getDocs, collectionGroup } from 'firebase/firestore';
+import { getFirestore, collection, getDocs } from 'firebase/firestore';
 import { initializeFirebase } from '@/firebase';
 
 function getPaymentStatus(tenant: Tenant, allPayments: Payment[]): { status: PaymentStatus, dueDate: Date } {
@@ -36,7 +40,7 @@ async function getProperties(): Promise<Property[]> {
         return propertySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Property));
     } catch (error) {
         console.error("Error fetching properties:", error);
-        return [];
+        throw error; // Re-throw to be caught by callers
     }
 }
 
@@ -74,45 +78,6 @@ export async function getTenantsWithDetails(): Promise<TenantWithDetails[]> {
 
     } catch (error) {
         console.error("Error fetching tenants with details:", error);
-        return [];
+        throw error; // Re-throw to be caught by callers
     }
-}
-
-
-export async function getDashboardData() {
-    const { firestore } = initializeFirebase();
-    const tenantsCollection = collection(firestore, 'tenants');
-    const propertiesCollection = collection(firestore, 'properties');
-    
-    const tenantSnapshot = await getDocs(tenantsCollection);
-    const propertySnapshot = await getDocs(propertiesCollection);
-
-    const totalTenants = tenantSnapshot.size;
-    const totalProperties = propertySnapshot.size;
-
-    const occupiedPropertyIds = new Set(tenantSnapshot.docs.map(doc => (doc.data() as Tenant).propertyId));
-    const vacantProperties = propertySnapshot.docs.filter(doc => !occupiedPropertyIds.has(doc.id)).length;
-
-    const tenantsWithDetails = await getTenantsWithDetails();
-    
-    const statusCounts = tenantsWithDetails.reduce((acc, tenant) => {
-        acc[tenant.paymentStatus] = (acc[tenant.paymentStatus] || 0) + 1;
-        return acc;
-    }, {} as Record<PaymentStatus, number>);
-
-    const overdueTenants = tenantsWithDetails.filter(t => t.paymentStatus === 'Overdue');
-    const upcomingPayments = tenantsWithDetails.filter(t => t.paymentStatus === 'Upcoming').sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime());
-
-    return {
-        totalTenants,
-        totalProperties,
-        vacantProperties,
-        statusCounts: {
-            paid: statusCounts.Paid || 0,
-            overdue: statusCounts.Overdue || 0,
-            upcoming: statusCounts.Upcoming || 0,
-        },
-        overdueTenants,
-        upcomingPayments: upcomingPayments.slice(0, 5) // Get next 5 upcoming
-    };
 }

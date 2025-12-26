@@ -1,4 +1,5 @@
-import { getDashboardData } from '@/lib/data-helpers';
+'use client';
+
 import { DashboardClient } from '@/components/dashboard/dashboard-client';
 import {
   Card,
@@ -16,11 +17,43 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { User, Loader2 } from 'lucide-react';
+import { useFirestore } from '@/firebase';
+import { collection, onSnapshot } from 'firebase/firestore';
+import { useEffect, useState } from 'react';
+import type { TenantWithDetails } from '@/lib/types';
+import { getTenantsWithDetails } from '@/lib/data-helpers';
 import { formatDistanceToNow } from 'date-fns';
-import { User } from 'lucide-react';
 
-export default async function DashboardPage() {
-  const dashboardData = await getDashboardData();
+export default function DashboardPage() {
+  const [overdueTenants, setOverdueTenants] = useState<TenantWithDetails[]>([]);
+  const [upcomingPayments, setUpcomingPayments] = useState<TenantWithDetails[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const firestore = useFirestore();
+
+  useEffect(() => {
+    if (!firestore) return;
+    
+    // We can use the existing helper, but it needs to be adapted for client-side use
+    // For now, let's just listen to tenants and update status.
+    const tenantsRef = collection(firestore, 'tenants');
+    const unsubscribe = onSnapshot(tenantsRef, async () => {
+      // Re-fetch all data when tenants change. This is inefficient but will work for now.
+      // A more optimized approach would listen to payments and properties as well.
+      try {
+        const data = await getTenantsWithDetails();
+        setOverdueTenants(data.filter(t => t.paymentStatus === 'Overdue'));
+        setUpcomingPayments(data.filter(t => t.paymentStatus === 'Upcoming').sort((a,b) => a.dueDate.getTime() - b.dueDate.getTime()).slice(0,5));
+      } catch (e) {
+        console.error("Error fetching tenant details for dashboard:", e);
+      } finally {
+        setIsLoading(false);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [firestore]);
+
 
   return (
     <div className="space-y-6">
@@ -31,7 +64,7 @@ export default async function DashboardPage() {
         </p>
       </div>
 
-      <DashboardClient data={dashboardData} />
+      <DashboardClient />
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
@@ -52,8 +85,14 @@ export default async function DashboardPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {dashboardData.overdueTenants.length > 0 ? (
-                  dashboardData.overdueTenants.map((tenant) => (
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={4} className="h-24 text-center">
+                      <Loader2 className="mx-auto h-6 w-6 animate-spin text-primary" />
+                    </TableCell>
+                  </TableRow>
+                ) : overdueTenants.length > 0 ? (
+                  overdueTenants.map((tenant) => (
                     <TableRow key={tenant.id}>
                       <TableCell>
                         <div className="flex items-center gap-3">
@@ -104,8 +143,14 @@ export default async function DashboardPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                 {dashboardData.upcomingPayments.length > 0 ? (
-                  dashboardData.upcomingPayments.map((tenant) => (
+                 {isLoading ? (
+                    <TableRow>
+                        <TableCell colSpan={3} className="h-24 text-center">
+                            <Loader2 className="mx-auto h-6 w-6 animate-spin text-primary" />
+                        </TableCell>
+                    </TableRow>
+                 ) : upcomingPayments.length > 0 ? (
+                  upcomingPayments.map((tenant) => (
                     <TableRow key={tenant.id}>
                       <TableCell>
                          <div className="flex items-center gap-3">
