@@ -1,14 +1,12 @@
-import { getTenantsWithDetails } from '@/lib/data-helpers';
 import { TenantList } from '@/components/tenants/tenant-list';
 import {
   Card,
   CardContent,
 } from '@/components/ui/card';
 
-export default async function TenantsPage() {
-  // This initial data will be replaced by the live Firestore data on the client.
-  const tenants = await getTenantsWithDetails();
-
+export default function TenantsPage() {
+  // Data is now fetched on the client inside TenantList.
+  // Passing an empty array to avoid breaking the component's initial render.
   return (
     <div className="space-y-6">
       <div>
@@ -19,7 +17,7 @@ export default async function TenantsPage() {
       </div>
       <Card>
         <CardContent className="pt-6">
-          <TenantList tenants={tenants} />
+          <TenantList tenants={[]} />
         </CardContent>
       </Card>
     </div>
