@@ -11,26 +11,43 @@ import { initializeFirebase } from '@/firebase';
 
 function getPaymentStatus(tenant: Tenant): { status: PaymentStatus, dueDate: Date } {
     const today = new Date();
+    today.setHours(0, 0, 0, 0); // Normalize today to the start of the day
+
     const lastPaid = tenant.lastPaidDate ? new Date(tenant.lastPaidDate) : new Date(tenant.leaseStartDate);
     
-    let dueDate = new Date(lastPaid.getFullYear(), lastPaid.getMonth(), tenant.paymentDay);
-    // The next due date is the month after the last payment was made.
-    dueDate.setMonth(dueDate.getMonth() + 1);
+    const leaseStart = new Date(tenant.leaseStartDate);
 
-    if (today > dueDate) {
-        return { status: 'Overdue', dueDate };
+    // Determine the most recent payment cycle start date before or on today
+    let currentCycleStart = new Date(today.getFullYear(), today.getMonth(), tenant.paymentDay);
+    if (today.getDate() < tenant.paymentDay) {
+        // We are in the previous month's payment cycle
+        currentCycleStart.setMonth(currentCycleStart.getMonth() - 1);
     }
     
-    const lastPaidYear = lastPaid.getFullYear();
-    const lastPaidMonth = lastPaid.getMonth();
-    const currentYear = today.getFullYear();
-    const currentMonth = today.getMonth();
-
-    if (lastPaidYear === currentYear && lastPaidMonth === currentMonth) {
-        return { status: 'Paid', dueDate };
+    // Ensure the cycle start is not before the lease start
+    if (currentCycleStart < leaseStart) {
+        currentCycleStart = new Date(leaseStart.getFullYear(), leaseStart.getMonth(), tenant.paymentDay);
+        if(leaseStart.getDate() > tenant.paymentDay) {
+            currentCycleStart.setMonth(currentCycleStart.getMonth() + 1)
+        }
+    }
+    
+    const nextDueDate = new Date(currentCycleStart.getFullYear(), currentCycleStart.getMonth(), tenant.paymentDay);
+    if(today >= nextDueDate) {
+         nextDueDate.setMonth(nextDueDate.getMonth() + 1);
     }
 
-    return { status: 'Upcoming', dueDate };
+
+    if (lastPaid >= currentCycleStart) {
+        return { status: 'Paid', dueDate: nextDueDate };
+    }
+
+    if (today >= new Date(currentCycleStart.getFullYear(), currentCycleStart.getMonth(), tenant.paymentDay)) {
+         const overdueDueDate = new Date(currentCycleStart.getFullYear(), currentCycleStart.getMonth(), tenant.paymentDay);
+         return { status: 'Overdue', dueDate: overdueDueDate };
+    }
+    
+    return { status: 'Upcoming', dueDate: nextDueDate };
 }
 
 async function getProperties(): Promise<Property[]> {
@@ -58,14 +75,25 @@ export async function getTenantsWithDetails(): Promise<TenantWithDetails[]> {
         const propertyMap = new Map<string, Property>(properties.map(p => [p.id, p]));
 
         const tenantsWithDetails: TenantWithDetails[] = tenantList.map(tenant => {
+            const property = propertyMap.get(tenant.propertyId);
+            if (!property) {
+                // This can happen if a property is deleted but the tenant still references it.
+                // We'll create a placeholder property to avoid crashing.
+                return {
+                    ...tenant,
+                    property: { id: tenant.propertyId, name: 'Unknown Property', group: 'Unknown', shopNumber: 0, address: '', paymentDay: tenant.paymentDay },
+                    paymentStatus: 'Upcoming',
+                    dueDate: new Date(),
+                };
+            }
             const { status, dueDate } = getPaymentStatus(tenant);
             return {
                 ...tenant,
-                property: propertyMap.get(tenant.propertyId)!,
+                property: property,
                 paymentStatus: status,
                 dueDate,
             };
-        });
+        }).filter(t => t.property.name !== 'Unknown Property'); // Filter out tenants with missing properties for safety
         
         return tenantsWithDetails;
 

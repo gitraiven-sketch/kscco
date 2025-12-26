@@ -15,27 +15,45 @@ import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 
-function getPaymentStatus(tenant: Tenant): { status: PaymentStatus; dueDate: Date } {
+function getPaymentStatus(tenant: Tenant): { status: PaymentStatus, dueDate: Date } {
     const today = new Date();
+    today.setHours(0, 0, 0, 0); // Normalize today to the start of the day
+
     const lastPaid = tenant.lastPaidDate ? new Date(tenant.lastPaidDate) : new Date(tenant.leaseStartDate);
     
-    let dueDate = new Date(lastPaid.getFullYear(), lastPaid.getMonth(), tenant.paymentDay);
-    dueDate.setMonth(dueDate.getMonth() + 1);
+    const leaseStart = new Date(tenant.leaseStartDate);
 
-    if (today > dueDate) {
-        return { status: 'Overdue', dueDate };
+    // Determine the most recent payment cycle start date before or on today
+    let currentCycleStart = new Date(today.getFullYear(), today.getMonth(), tenant.paymentDay);
+    if (today.getDate() < tenant.paymentDay) {
+        // We are in the previous month's payment cycle
+        currentCycleStart.setMonth(currentCycleStart.getMonth() - 1);
     }
     
-    const lastPaidYear = lastPaid.getFullYear();
-    const lastPaidMonth = lastPaid.getMonth();
-    const currentYear = today.getFullYear();
-    const currentMonth = today.getMonth();
-
-    if (lastPaidYear === currentYear && lastPaidMonth === currentMonth) {
-        return { status: 'Paid', dueDate };
+    // Ensure the cycle start is not before the lease start
+    if (currentCycleStart < leaseStart) {
+        currentCycleStart = new Date(leaseStart.getFullYear(), leaseStart.getMonth(), tenant.paymentDay);
+        if(leaseStart.getDate() > tenant.paymentDay) {
+            currentCycleStart.setMonth(currentCycleStart.getMonth() + 1)
+        }
+    }
+    
+    const nextDueDate = new Date(currentCycleStart.getFullYear(), currentCycleStart.getMonth(), tenant.paymentDay);
+    if(today >= nextDueDate) {
+         nextDueDate.setMonth(nextDueDate.getMonth() + 1);
     }
 
-    return { status: 'Upcoming', dueDate };
+
+    if (lastPaid >= currentCycleStart) {
+        return { status: 'Paid', dueDate: nextDueDate };
+    }
+
+    if (today >= new Date(currentCycleStart.getFullYear(), currentCycleStart.getMonth(), tenant.paymentDay)) {
+         const overdueDueDate = new Date(currentCycleStart.getFullYear(), currentCycleStart.getMonth(), tenant.paymentDay);
+         return { status: 'Overdue', dueDate: overdueDueDate };
+    }
+    
+    return { status: 'Upcoming', dueDate: nextDueDate };
 }
 
 
@@ -162,12 +180,14 @@ export default function TenantDetailPage() {
     setIsUpdating(true);
     const tenantRef = doc(firestore, 'tenants', tenantId);
     
-    // Calculate the previous month's date
-    const lastPaid = new Date(tenant.lastPaidDate || tenant.leaseStartDate);
-    const previousMonthDate = new Date(lastPaid.getFullYear(), lastPaid.getMonth() - 1, 15); // middle of the month to avoid edge cases
+    // To revert, we set the lastPaidDate to a date within the *previous* payment cycle.
+    // A simple way is to go back a month from the current due date.
+    const dueDate = tenantDetails?.dueDate || new Date();
+    const previousCycleDate = new Date(dueDate.getFullYear(), dueDate.getMonth() - 1, tenant.paymentDay);
+
 
     try {
-        await updateDoc(tenantRef, { lastPaidDate: previousMonthDate.toISOString() });
+        await updateDoc(tenantRef, { lastPaidDate: previousCycleDate.toISOString() });
         toast({
             title: 'Payment Reverted',
             description: `Reverted last payment for ${tenant.name}.`,
@@ -176,7 +196,7 @@ export default function TenantDetailPage() {
          const permissionError = new FirestorePermissionError({
             path: `tenants/${tenantId}`,
             operation: 'update',
-            requestResourceData: { lastPaidDate: previousMonthDate.toISOString() },
+            requestResourceData: { lastPaidDate: previousCycleDate.toISOString() },
         }, auth);
         errorEmitter.emit('permission-error', permissionError);
     } finally {
@@ -254,7 +274,7 @@ export default function TenantDetailPage() {
                     <div className="flex items-start gap-3 rounded-lg border p-4">
                         <Calendar className="h-6 w-6 text-muted-foreground" />
                         <div>
-                            <div className="font-semibold">Next Due Date</div>
+                            <div className="font-semibold">Due Date</div>
                             <div className="text-muted-foreground">{format(tenantDetails.dueDate, 'do MMMM, yyyy')}</div>
                         </div>
                     </div>
@@ -272,7 +292,7 @@ export default function TenantDetailPage() {
                     {isUpdating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Mark as Paid
                 </Button>
-                <Button onClick={handleRevertPayment} disabled={isUpdating} variant="destructive">
+                <Button onClick={handleRevertPayment} disabled={isUpdating} variant="outline">
                      {isUpdating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Revert to Unpaid
                 </Button>
