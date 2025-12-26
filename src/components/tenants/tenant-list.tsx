@@ -220,7 +220,10 @@ function EditTenantForm({ tenant, onTenantUpdated, properties }: { tenant: Tenan
     setIsLoading(true);
     const tenantRef = doc(firestore, 'tenants', tenant.id);
     
-    const { id, ...updateData } = editedTenant;
+    const { id, ...updateData } = {
+        ...editedTenant,
+        phone: editedTenant.phone.startsWith('+260') ? editedTenant.phone : `+260${editedTenant.phone}`
+    };
 
     updateDoc(tenantRef, {
       ...updateData,
@@ -247,6 +250,8 @@ function EditTenantForm({ tenant, onTenantUpdated, properties }: { tenant: Tenan
         setIsLoading(false);
       });
   };
+  
+  const displayPhone = editedTenant.phone.startsWith('+260') ? editedTenant.phone.substring(4) : editedTenant.phone;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -269,8 +274,15 @@ function EditTenantForm({ tenant, onTenantUpdated, properties }: { tenant: Tenan
               <Input id="name" name="name" value={editedTenant.name} onChange={handleChange} required className="col-span-3" />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="phone" className="text-right">Phone</Label>
-              <Input id="phone" name="phone" value={editedTenant.phone} onChange={handleChange} required className="col-span-3" />
+                <Label htmlFor="phone" className="text-right">
+                    Phone
+                </Label>
+                <div className="col-span-3 flex items-center">
+                    <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-input bg-background text-sm text-muted-foreground h-10">
+                    +260
+                    </span>
+                    <Input id="phone" name="phone" value={displayPhone} onChange={handleChange} required className="rounded-l-none" />
+                </div>
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="propertyId" className="text-right">Property</Label>
@@ -326,9 +338,10 @@ function AddTenantForm({ onTenantAdded, properties }: { onTenantAdded: () => voi
 
     setIsLoading(true);
     const formData = new FormData(event.currentTarget);
+    const phone = formData.get('phone') as string;
     const newTenantData = {
         name: formData.get('name') as string,
-        phone: formData.get('phone') as string,
+        phone: `+260${phone}`,
         propertyId: propertyId,
         rentAmount: Number(formData.get('rentAmount')),
         paymentDay: Number(formData.get('paymentDay')),
@@ -394,7 +407,12 @@ function AddTenantForm({ onTenantAdded, properties }: { onTenantAdded: () => voi
               <Label htmlFor="phone" className="text-right">
                 Phone
               </Label>
-              <Input id="phone" name="phone" required className="col-span-3" />
+                <div className="col-span-3 flex items-center">
+                    <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-input bg-background text-sm text-muted-foreground h-10">
+                    +260
+                    </span>
+                    <Input id="phone" name="phone" required className="rounded-l-none" placeholder="977123456" />
+                </div>
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="propertyId" className="text-right">
