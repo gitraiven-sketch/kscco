@@ -80,11 +80,20 @@ export async function getTenantsWithDetails(): Promise<TenantWithDetails[]> {
 
 
 export async function getDashboardData() {
-    const tenantsWithDetails = await getTenantsWithDetails();
-    const properties = await getProperties();
+    const { firestore } = initializeFirebase();
+    const tenantsCollection = collection(firestore, 'tenants');
+    const propertiesCollection = collection(firestore, 'properties');
+    
+    const tenantSnapshot = await getDocs(tenantsCollection);
+    const propertySnapshot = await getDocs(propertiesCollection);
 
-    const totalTenants = tenantsWithDetails.length;
-    const totalProperties = properties.length;
+    const totalTenants = tenantSnapshot.size;
+    const totalProperties = propertySnapshot.size;
+
+    const occupiedPropertyIds = new Set(tenantSnapshot.docs.map(doc => (doc.data() as Tenant).propertyId));
+    const vacantProperties = propertySnapshot.docs.filter(doc => !occupiedPropertyIds.has(doc.id)).length;
+
+    const tenantsWithDetails = await getTenantsWithDetails();
     
     const statusCounts = tenantsWithDetails.reduce((acc, tenant) => {
         acc[tenant.paymentStatus] = (acc[tenant.paymentStatus] || 0) + 1;
@@ -97,6 +106,7 @@ export async function getDashboardData() {
     return {
         totalTenants,
         totalProperties,
+        vacantProperties,
         statusCounts: {
             paid: statusCounts.Paid || 0,
             overdue: statusCounts.Overdue || 0,

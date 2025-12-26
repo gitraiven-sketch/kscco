@@ -1,5 +1,9 @@
 'use client';
 
+import { useEffect, useState } from 'react';
+import { useFirestore } from '@/firebase';
+import { collection, onSnapshot, getDocs } from 'firebase/firestore';
+import type { Tenant, Property } from '@/lib/types';
 import {
   Card,
   CardContent,
@@ -8,9 +12,9 @@ import {
 } from '@/components/ui/card';
 import {
   BarChart,
-  DollarSign,
   Users,
   Building,
+  Home,
   CheckCircle,
   Clock,
   AlertCircle,
@@ -26,6 +30,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 type DashboardData = {
   totalTenants: number;
   totalProperties: number;
+  vacantProperties: number;
   statusCounts: {
     paid: number;
     overdue: number;
@@ -51,7 +56,40 @@ const chartConfig: ChartConfig = {
   },
 };
 
-export function DashboardClient({ data }: { data: DashboardData }) {
+export function DashboardClient({ data: initialData }: { data: DashboardData }) {
+  const firestore = useFirestore();
+  const [data, setData] = useState(initialData);
+
+  useEffect(() => {
+    if (!firestore) return;
+
+    const tenantsRef = collection(firestore, 'tenants');
+    const propertiesRef = collection(firestore, 'properties');
+
+    const unsubTenants = onSnapshot(tenantsRef, (snapshot) => {
+        setData(prevData => ({...prevData, totalTenants: snapshot.size}));
+    });
+
+    const unsubProperties = onSnapshot(propertiesRef, async (propSnapshot) => {
+        const tenantSnapshot = await getDocs(tenantsRef);
+        const occupiedPropertyIds = new Set(tenantSnapshot.docs.map(doc => (doc.data() as Tenant).propertyId));
+        
+        const vacantCount = propSnapshot.docs.filter(doc => !occupiedPropertyIds.has(doc.id)).length;
+        
+        setData(prevData => ({
+            ...prevData, 
+            totalProperties: propSnapshot.size,
+            vacantProperties: vacantCount,
+        }));
+    });
+
+    return () => {
+        unsubTenants();
+        unsubProperties();
+    };
+  }, [firestore]);
+
+
   const chartData = [
     { name: 'paid', value: data.statusCounts.paid, fill: 'var(--color-paid)' },
     { name: 'overdue', value: data.statusCounts.overdue, fill: 'var(--color-overdue)' },
@@ -80,17 +118,17 @@ export function DashboardClient({ data }: { data: DashboardData }) {
           <p className="text-xs text-muted-foreground">Currently active tenants</p>
         </CardContent>
       </Card>
-      <Card>
+       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Overdue Payments</CardTitle>
-          <AlertCircle className="h-4 w-4 text-destructive" />
+          <CardTitle className="text-sm font-medium">Vacant Shops</CardTitle>
+          <Home className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{data.statusCounts.overdue}</div>
-          <p className="text-xs text-muted-foreground">Tenants with late payments</p>
+          <div className="text-2xl font-bold">{data.vacantProperties}</div>
+          <p className="text-xs text-muted-foreground">Properties without tenants</p>
         </CardContent>
       </Card>
-      <Card className="md:col-span-2 lg:col-span-1">
+      <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">
             This Month's Payment Status
