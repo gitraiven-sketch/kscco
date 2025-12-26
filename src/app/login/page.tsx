@@ -26,7 +26,7 @@ function BuildingIcon(props: React.SVGProps<SVGSVGElement>) {
       xmlns="http://www.w3.org/2000/svg"
       width="24"
       height="24"
-      viewBox="0 0 24"
+      viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
       strokeWidth="2"
@@ -157,12 +157,6 @@ export default function LoginPage() {
               {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Sign In
             </Button>
-             <p className="text-sm text-center text-muted-foreground">
-              Don&apos;t have an account?{' '}
-              <Link href="/signup" className="font-semibold text-primary hover:underline">
-                Sign up
-              </Link>
-            </p>
           </CardFooter>
         </form>
       </Card>
