@@ -105,49 +105,53 @@ function TenantReminderCard({ tenant, proximity }: { tenant: TenantWithDetails, 
 }
 
 function OverdueAdminReminder({ overdueTenants }: { overdueTenants: TenantWithDetails[] }) {
-  const [whatsAppMessage, setWhatsAppMessage] = React.useState<string | null>(null);
+  const [emailContent, setEmailContent] = React.useState<{ subject: string, body: string } | null>(null);
   const [isLoading, setIsLoading] = React.useState(false);
   const { toast } = useToast();
-  const adminPhoneNumber = "+260978646249";
+  const adminEmail = "kfikreselassie@gmail.com";
 
   if (overdueTenants.length === 0) {
     return null;
   }
 
-  const handleGenerateMessage = async () => {
+  const handleGenerateEmail = async () => {
     setIsLoading(true);
-    setWhatsAppMessage(null);
+    setEmailContent(null);
     try {
-      // We can construct the message directly, Genkit might be overkill for this fixed format.
-      let message = `*Overdue Rent Summary*\n\nThere are ${overdueTenants.length} tenants with overdue payments:\n`;
-      overdueTenants.forEach(t => {
-        const daysOverdue = formatDistanceToNowStrict(t.dueDate, { unit: 'day' });
-        message += `\n- *${t.name}* (${t.property.name})\n  Overdue by: ${daysOverdue}\n  Amount: K${t.rentAmount.toLocaleString()}`;
+      const overdueDetails = overdueTenants.map(t => ({
+        tenantName: t.name,
+        propertyName: t.property.name,
+        rentAmount: t.rentAmount,
+        daysOverdue: formatDistanceToNowStrict(t.dueDate, { addSuffix: true }),
+      }));
+
+      const result = await generateAdminOverdueNotice({
+        overdueTenants: overdueDetails,
+        totalOverdue: overdueTenants.length,
       });
-      message += "\n\nPlease follow up as soon as possible.";
       
-      setWhatsAppMessage(message);
+      setEmailContent(result);
       toast({
-        title: "Admin Message Generated",
-        description: "Overdue payment summary for WhatsApp is ready.",
+        title: "Admin Email Generated",
+        description: "Overdue payment summary email is ready to be sent.",
       });
 
     } catch (error) {
-      console.error("Failed to generate admin message:", error);
+      console.error("Failed to generate admin email:", error);
       toast({
         variant: "destructive",
         title: "Generation Failed",
-        description: "Could not generate the admin notification message.",
+        description: "Could not generate the admin notification email.",
       });
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleSendMessage = () => {
-    if (!whatsAppMessage) return;
-    const whatsappLink = `https://wa.me/${adminPhoneNumber.replace('+', '')}?text=${encodeURIComponent(whatsAppMessage)}`;
-    window.open(whatsappLink, '_blank');
+  const handleSendEmail = () => {
+    if (!emailContent) return;
+    const mailtoLink = `mailto:${adminEmail}?subject=${encodeURIComponent(emailContent.subject)}&body=${encodeURIComponent(emailContent.body)}`;
+    window.open(mailtoLink, '_blank');
   };
 
 
@@ -159,26 +163,31 @@ function OverdueAdminReminder({ overdueTenants }: { overdueTenants: TenantWithDe
                 <div>
                     <CardTitle className="text-destructive">Overdue Payment Alert</CardTitle>
                     <CardDescription>
-                        Generate and send a WhatsApp summary of overdue tenants to the administrator.
+                        Generate and send an email summary of overdue tenants to the administrator.
                     </CardDescription>
                 </div>
             </div>
         </CardHeader>
-        {whatsAppMessage && (
+        {emailContent && (
              <CardContent className="space-y-4">
-                 <div className="space-y-1 rounded-md border bg-background p-4">
-                    <h4 className="font-medium">WhatsApp Message:</h4>
-                    <p className="text-sm text-muted-foreground whitespace-pre-wrap">{whatsAppMessage}</p>
+                 <div className="space-y-2 rounded-md border bg-background p-4">
+                    <h4 className="font-medium">Email Subject:</h4>
+                    <p className="text-sm text-muted-foreground">{emailContent.subject}</p>
+                 </div>
+                 <div className="space-y-2 rounded-md border bg-background p-4">
+                    <h4 className="font-medium">Email Body:</h4>
+                    <p className="text-sm text-muted-foreground whitespace-pre-wrap">{emailContent.body}</p>
                 </div>
             </CardContent>
         )}
         <CardFooter className="flex justify-between">
-            <Button size="sm" variant="outline" onClick={handleGenerateMessage} disabled={isLoading}>
+            <Button size="sm" variant="outline" onClick={handleGenerateEmail} disabled={isLoading}>
                 {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
-                {whatsAppMessage ? 'Regenerate Message' : 'Generate Admin Message'}
+                {emailContent ? 'Regenerate Email' : 'Generate Admin Email'}
             </Button>
-            <Button size="sm" onClick={handleSendMessage} disabled={!whatsAppMessage || isLoading}>
-                Send via WhatsApp
+            <Button size="sm" onClick={handleSendEmail} disabled={!emailContent || isLoading}>
+                <Mail className="mr-2 h-4 w-4" />
+                Send via Email
             </Button>
         </CardFooter>
     </Card>
