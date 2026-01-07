@@ -17,43 +17,54 @@ import Link from 'next/link';
 
 function getPaymentStatus(tenant: Tenant): { status: PaymentStatus, dueDate: Date } {
     const today = new Date();
-    today.setHours(0, 0, 0, 0); // Normalize today to the start of the day
+    today.setHours(0, 0, 0, 0);
 
-    const lastPaid = tenant.lastPaidDate ? new Date(tenant.lastPaidDate) : new Date(tenant.leaseStartDate);
-    
     const leaseStart = new Date(tenant.leaseStartDate);
+    leaseStart.setHours(0, 0, 0, 0);
 
-    // Determine the most recent payment cycle start date before or on today
-    let currentCycleStart = new Date(today.getFullYear(), today.getMonth(), tenant.paymentDay);
-    if (today.getDate() < tenant.paymentDay) {
-        // We are in the previous month's payment cycle
-        currentCycleStart.setMonth(currentCycleStart.getMonth() - 1);
-    }
-    
-    // Ensure the cycle start is not before the lease start
-    if (currentCycleStart < leaseStart) {
-        currentCycleStart = new Date(leaseStart.getFullYear(), leaseStart.getMonth(), tenant.paymentDay);
-        if(leaseStart.getDate() > tenant.paymentDay) {
-            currentCycleStart.setMonth(currentCycleStart.getMonth() + 1)
-        }
-    }
-    
-    const nextDueDate = new Date(currentCycleStart.getFullYear(), currentCycleStart.getMonth(), tenant.paymentDay);
-    if(today >= nextDueDate) {
-         nextDueDate.setMonth(nextDueDate.getMonth() + 1);
+    const lastPaid = tenant.lastPaidDate ? new Date(tenant.lastPaidDate) : new Date(0); // Use epoch if never paid
+    lastPaid.setHours(0, 0, 0, 0);
+
+    // Determine the start and end of the current payment cycle
+    let cycleStart, cycleEnd;
+    const paymentDay = tenant.paymentDay;
+
+    if (today.getDate() >= paymentDay) {
+        // We are in the cycle for the current month
+        cycleStart = new Date(today.getFullYear(), today.getMonth(), paymentDay);
+    } else {
+        // We are in the cycle for the previous month
+        cycleStart = new Date(today.getFullYear(), today.getMonth() - 1, paymentDay);
     }
 
+    // Ensure cycle doesn't start before the lease
+    if (cycleStart < leaseStart) {
+        cycleStart = new Date(leaseStart.getFullYear(), leaseStart.getMonth(), leaseStart.getDate());
+    }
 
-    if (lastPaid >= currentCycleStart) {
+    cycleEnd = new Date(cycleStart.getFullYear(), cycleStart.getMonth() + 1, paymentDay - 1);
+    cycleEnd.setHours(23, 59, 59, 999);
+
+
+    // Determine the due date for the current cycle
+    const currentDueDate = new Date(cycleStart);
+
+    // Determine next month's due date
+    const nextDueDate = new Date(today.getFullYear(), today.getMonth(), paymentDay);
+    if(today.getDate() >= paymentDay) {
+        nextDueDate.setMonth(nextDueDate.getMonth() + 1);
+    }
+
+
+    if (lastPaid >= cycleStart) {
         return { status: 'Paid', dueDate: nextDueDate };
     }
 
-    if (today >= new Date(currentCycleStart.getFullYear(), currentCycleStart.getMonth(), tenant.paymentDay)) {
-         const overdueDueDate = new Date(currentCycleStart.getFullYear(), currentCycleStart.getMonth(), tenant.paymentDay);
-         return { status: 'Overdue', dueDate: overdueDueDate };
+    if (today >= currentDueDate) {
+        return { status: 'Overdue', dueDate: currentDueDate };
     }
     
-    return { status: 'Upcoming', dueDate: nextDueDate };
+    return { status: 'Upcoming', dueDate: currentDueDate };
 }
 
 
