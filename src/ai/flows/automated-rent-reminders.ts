@@ -48,7 +48,7 @@ Do not mention the rent amount.
 Tailor the message urgency based on the proximity.
 - If the payment is due "today", the message should be a final reminder to pay now.
 - If it's due "tomorrow" or in a few days, it should be a gentle reminder.
-End with "Thank you, Kabwata Shopping Complex Management".`,
+End with "Thank you, Kabwata Shopping Complex Admin".`,
 });
 
 

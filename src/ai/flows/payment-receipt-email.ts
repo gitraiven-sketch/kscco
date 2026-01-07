@@ -46,7 +46,7 @@ The email should have a clear subject line like "Payment Receipt - Kabwata Shopp
 The body should start with "Dear {{tenantName}}," and clearly state that the payment has been received and processed.
 Mention the property, amount, and date.
 If a receipt URL is provided, include a line that says "You can view your receipt here: {{receiptUrl}}".
-End with "Thank you for your timely payment." and "Sincerely, Kabwata Shopping Complex Management".`,
+End with "Thank you for your timely payment." and "Sincerely, Kabwata Shopping Complex Admin".`,
 });
 
 
