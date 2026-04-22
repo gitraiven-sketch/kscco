@@ -1,9 +1,6 @@
 
-// This file is now marked for client-side execution,
-// but can be used on the server as well.
-'use client'; 
-// Using 'use client' is a temporary workaround. Ideally, this would be refactored
-// to have distinct server and client data functions.
+// This file is for server-side data fetching.
+// Removed 'use client' to allow use in server components.
 
 import type { Tenant, Property, TenantWithDetails, PaymentStatus } from './types';
 import { getFirestore, collection, getDocs } from 'firebase/firestore';
