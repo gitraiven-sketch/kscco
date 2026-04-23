@@ -5,6 +5,8 @@ import {
   CardContent,
 } from '@/components/ui/card';
 
+export const dynamic = 'force-dynamic';
+
 export default async function HistoryPage() {
     const tenants = await getTenantsWithDetails();
 

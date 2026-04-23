@@ -1,7 +1,7 @@
 'use client';
 
 import { getTenantsWithDetails } from '@/lib/data-helpers';
-import { CategorizedRentReminders } from '@/components/reminders/rent-reminder';
+import { RentReminder } from '@/components/reminders/rent-reminder';
 import { useEffect, useState } from 'react';
 import type { TenantWithDetails } from '@/lib/types';
 import { Loader2 } from 'lucide-react';
@@ -86,7 +86,7 @@ export default function RemindersPage() {
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
          </div>
       ) : (
-        <CategorizedRentReminders categorizedTenants={categorizedTenants} />
+        <RentReminder categorizedTenants={categorizedTenants} />
       )}
     </div>
   );
