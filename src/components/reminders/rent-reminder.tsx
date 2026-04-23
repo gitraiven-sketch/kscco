@@ -21,8 +21,7 @@ import type { TenantWithDetails } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { generateSingleRentReminder } from '@/ai/flows/automated-rent-reminders';
 import { sendAdminOverdueNotice } from '@/ai/flows/send-admin-notice';
-import { format, formatDistanceToNowStrict } from 'date-fns';
-import { Loader2, Wand2, User, Building, AlertTriangle, Mail } from 'lucide-react';
+import { differenceInDays } from 'date-fns';
 
 type CategorizedTenants = {
   dueIn3Days: TenantWithDetails[];
@@ -32,7 +31,19 @@ type CategorizedTenants = {
   overdue: TenantWithDetails[];
 }
 
-function TenantReminderCard({ tenant, proximity }: { tenant: TenantWithDetails, proximity: string }) {
+function categorizeTenants(tenants: TenantWithDetails[]): CategorizedTenants {
+  const now = new Date();
+  return {
+    dueIn3Days: tenants.filter(t => differenceInDays(t.dueDate, now) === 3),
+    dueIn2Days: tenants.filter(t => differenceInDays(t.dueDate, now) === 2),
+    dueIn1Day: tenants.filter(t => differenceInDays(t.dueDate, now) === 1),
+    dueToday: tenants.filter(t => differenceInDays(t.dueDate, now) === 0),
+    overdue: tenants.filter(t => differenceInDays(t.dueDate, now) < 0),
+  };
+}
+
+export function RentReminder({ tenants }: { tenants: TenantWithDetails[] }) {
+  const categorizedTenants = categorizeTenants(tenants);
   const [isLoading, setIsLoading] = React.useState(false);
   const [message, setMessage] = React.useState<string | null>(null);
   const { toast } = useToast();
@@ -195,7 +206,7 @@ function ReminderCategory({ title, tenants, proximity }: { title: string, tenant
 }
 
 
-export function CategorizedRentReminders({ categorizedTenants }: { categorizedTenants: CategorizedTenants }) {
+export function RentReminder({ categorizedTenants }: { categorizedTenants: CategorizedTenants }) {
   const { dueIn3Days, dueIn2Days, dueIn1Day, dueToday, overdue } = categorizedTenants;
 
   const defaultOpen = [

@@ -29,15 +29,6 @@ const nextConfig = {
     ],
   },
   experimental: {
-    turbopack: {
-      resolveAlias: {
-        './utils': './utils.ts',
-        './lib': './lib.ts',
-      },
-      loaders: {
-        '.js': ['jsx'],
-      },
-    },
   },
 };
 
